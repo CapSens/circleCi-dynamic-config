@@ -1,0 +1,165 @@
+version: 2.1
+commands: # a reusable command with parameters
+  setup_env:
+    steps:
+      - checkout
+      - run:
+          name: Database Config
+          command: cp config/database.yml.ci config/database.yml
+      - run:
+          name: Install Bundler
+          # mettre ici la meme version que celle utilisée pour générer le gemfile.lock sinon le cache ne marchera pas
+          command: gem install bundler:2.2.16
+      - restore_cache:
+         key: my-app-{{ checksum "Gemfile.lock" }}
+      - run:
+          name: Bundle install
+          command: bundle install --path vendor/bundle
+      - save_cache:
+          key: my-app-{{ checksum "Gemfile.lock" }}
+          paths:
+              - vendor/bundle
+      - run:
+          name: Database initialization
+          command: bundle exec rake db:create db:migrate
+jobs:
+  spec:
+    working_directory: ~/test-intranet-staging
+    docker:
+      - image: capsens/ruby-node-yarn:2.7.1
+        environment:
+          PGHOST: localhost
+          PGUSER: test-intranet-staging
+          RAILS_ENV: test
+      - image: postgres:12
+        environment:
+          POSTGRES_USER: test-intranet-staging
+          POSTGRES_DB: test-intranet-staging
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+    parallelism: 8
+    steps:
+      - setup_env
+      - run:
+          name: Test
+          command: |
+            yarn
+            circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
+            bundle exec rspec $(cat /tmp/tests-to-run)
+  assets:
+    working_directory: ~/test-intranet-staging
+    docker:
+      - image: capsens/ruby-node-yarn:2.7.1
+        environment:
+          PGHOST: localhost
+          PGUSER: test-intranet-staging
+          RAILS_ENV: test
+      - image: postgres:12
+        environment:
+          POSTGRES_USER: test-intranet-staging
+          POSTGRES_DB: test-intranet-staging
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+    steps:
+      - setup_env
+      - run:
+          name: "Compile and serve assets"
+          command: |
+            if [ $CIRCLE_BRANCH == staging ]
+            then
+              export ASSETS_ENV=staging
+              export S3_ASSETS_BUCKET=fake-project-for-test-staging-assets
+            elif [ $CIRCLE_BRANCH == master ]
+            then
+              export ASSETS_ENV=production
+              export S3_ASSETS_BUCKET=fake-project-for-test-production-assets
+            else
+              exit 0
+            fi
+
+            export AWS_ACCESS_KEY_ID=AKIAVYUUQL5DV75XZ2WN
+            export AWS_SECRET_ACCESS_KEY=t8ZFJhybumQGjRn5b7qAxTQfI3HE92r7gnwwXu4j
+            yarn
+            RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
+            RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
+            aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read
+            aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read
+  security_check:
+    working_directory: ~/test-intranet-staging
+    docker:
+      - image: capsens/ruby-node-yarn:2.7.1
+        environment:
+          RAILS_ENV: test
+    steps:
+      - checkout
+      - run:
+          name: "Audit Securité du Gemfile"
+          command: |
+            gem install bundler-audit
+            bundle audit --update
+  code_review:
+    working_directory: ~/test-intranet-staging
+    docker:
+      - image: capsens/ruby-node-yarn:2.7.1
+        environment:
+          RAILS_ENV: test
+    steps:
+      - checkout
+      - run:
+          name: Coding style
+          command: |
+            gem install rubocop
+            mkdir rubocop
+            rubocop --format html -o rubocop/rubocop.html || true
+      - run:
+          name: Notation
+          command: |
+            gem install simplecov
+            gem install rubycritic
+            rubycritic app --no-browser
+      - run:
+          name: "Complexité cyclomatique"
+          command: |
+            gem install fukuzatsu
+            fuku check app -f html
+      - run:
+          name: "Axe d'optimisation"
+          command: |
+            gem install fasterer
+            cat \<< EOF > .fasterer.yml
+            exclude_paths:
+              - 'vendor/**/*.rb'
+              - 'db/schema.rb'
+            EOF
+            fasterer || true
+      - run:
+          name: "Audit de securité de l'application"
+          command: |
+            gem install brakeman
+            mkdir security
+            brakeman -o security/brakeman.html || true
+      - store_artifacts:
+          path: security/brakeman.html
+      - store_artifacts:
+          path: rubocop/rubocop.html
+      - store_artifacts:
+          path: tmp/rubycritic
+      - store_artifacts:
+          path: doc/fukuzatsu/htm
+      - store_artifacts:
+          path: coverage
+workflows:
+    version: 2
+    'workflow':
+        jobs:
+            - spec
+            - security_check
+            - assets:
+                filters:
+                  branches:
+                    only: ['master', 'staging']
+                requires: ['spec', 'security_check']
+            - code_review:
+                filters:
+                  branches:
+                    only: ['master', 'staging']
