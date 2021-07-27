@@ -1,4 +1,22 @@
 version: 2.1
+
+parameters:
+  project-name:
+    type: string
+    default: 'my-project' # must match pg_username and pg_database into database.yml.ci
+  ruby-version:
+    type: string
+    default: "2.7.1"
+  bundler-version:
+    type: string
+    default: "2.2.16"
+  assets-bucket-staging:
+    type: string
+    default: ""
+  assets-bucket-production:
+    type: string
+    default: ""
+
 commands: # a reusable command with parameters
   setup_env:
     steps:
