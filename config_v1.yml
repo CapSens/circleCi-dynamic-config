@@ -9,7 +9,7 @@ commands: # a reusable command with parameters
       - run:
           name: Install Bundler
           # mettre ici la meme version que celle utilisée pour générer le gemfile.lock sinon le cache ne marchera pas
-          command: gem install bundler:2.2.16
+          command: gem install bundler:<< pipeline.parameters.bundler-version >>
       - restore_cache:
          key: my-app-{{ checksum "Gemfile.lock" }}
       - run:
@@ -24,17 +24,17 @@ commands: # a reusable command with parameters
           command: bundle exec rake db:create db:migrate
 jobs:
   spec:
-    working_directory: ~/test-intranet-staging
+    working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
-      - image: capsens/ruby-node-yarn:2.7.1
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
           PGHOST: localhost
-          PGUSER: test-intranet-staging
+          PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
       - image: postgres:12
         environment:
-          POSTGRES_USER: test-intranet-staging
-          POSTGRES_DB: test-intranet-staging
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
     parallelism: 8
@@ -47,17 +47,17 @@ jobs:
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run)
   assets:
-    working_directory: ~/test-intranet-staging
+    working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
-      - image: capsens/ruby-node-yarn:2.7.1
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
           PGHOST: localhost
-          PGUSER: test-intranet-staging
+          PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
       - image: postgres:12
         environment:
-          POSTGRES_USER: test-intranet-staging
-          POSTGRES_DB: test-intranet-staging
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
     steps:
@@ -68,26 +68,26 @@ jobs:
             if [ $CIRCLE_BRANCH == staging ]
             then
               export ASSETS_ENV=staging
-              export S3_ASSETS_BUCKET=fake-project-for-test-staging-assets
+              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-staging >>
             elif [ $CIRCLE_BRANCH == master ]
             then
               export ASSETS_ENV=production
-              export S3_ASSETS_BUCKET=fake-project-for-test-production-assets
+              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-production >>
             else
               exit 0
             fi
 
-            export AWS_ACCESS_KEY_ID=AKIAVYUUQL5DV75XZ2WN
-            export AWS_SECRET_ACCESS_KEY=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
+            echo $AWS_ACCESS_KEY_ID
+            echo $AWS_SECRET_ACCESS_KEY
             yarn
             RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
             RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
             aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read
             aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read
   security_check:
-    working_directory: ~/test-intranet-staging
+    working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
-      - image: capsens/ruby-node-yarn:2.7.1
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
           RAILS_ENV: test
     steps:
@@ -98,9 +98,9 @@ jobs:
             gem install bundler-audit
             bundle audit --update
   code_review:
-    working_directory: ~/test-intranet-staging
+    working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
-      - image: capsens/ruby-node-yarn:2.7.1
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
           RAILS_ENV: test
     steps:
@@ -155,6 +155,8 @@ workflows:
             - spec
             - security_check
             - assets:
+                context:
+                  - ASSETS
                 filters:
                   branches:
                     only: ['master', 'staging']
