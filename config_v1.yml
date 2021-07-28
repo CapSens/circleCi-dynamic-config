@@ -136,7 +136,7 @@ jobs:
               IGNORE="--ignore$IGNORE"
             fi
 
-            bundle audit --update
+            bundle audit --update $IGNORE
   code_review:
     working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
