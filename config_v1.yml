@@ -43,6 +43,14 @@ commands: # a reusable command with parameters
           key: my-app-{{ checksum "Gemfile.lock" }}
           paths:
               - vendor/bundle
+      - when:
+          condition: << pipeline.parameters.install-redis >>
+          steps:
+            - run:
+                name: Redis
+                command: |
+                  apt-get install -y redis-server
+                  service redis-server start
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
