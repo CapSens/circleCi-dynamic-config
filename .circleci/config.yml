@@ -1,0 +1,18 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/circleCi-dynamic-config
+    docker:
+      - image: circleci/circleci-cli:alpine
+    steps:
+      - checkout
+      - run:
+          name: Config circleCi CLI
+          command: circleci setup --no-prompt --host https://circleci.com --token ${CIRCLE_CI_TOKEN}
+      - run:
+          name: Validate configurations
+          command: |
+            for f in configs/*.yml
+            do
+              circleci config validate $f
+            done
