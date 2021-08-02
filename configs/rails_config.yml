@@ -22,6 +22,9 @@ parameters:
   install-redis:
     type: boolean
     default: false
+  tests-parallelism:
+    type: integer
+    default: 4
 
 commands: # a reusable command with parameters
   setup_env:
@@ -69,7 +72,7 @@ jobs:
           POSTGRES_DB: << pipeline.parameters.project-name >>
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
-    parallelism: 8
+    parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
       - run:
