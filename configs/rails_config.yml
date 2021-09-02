@@ -24,7 +24,7 @@ parameters:
     default: false
   tests-parallelism:
     type: integer
-    default: 4
+    default: 1
 
 commands: # a reusable command with parameters
   setup_env:
