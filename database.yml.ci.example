@@ -1,0 +1,30 @@
+# username and database must have the value of project_name variable from .circleci/config.yml
+test:
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  timeout: 5000
+  host: localhost
+  username: myapp
+  password: ""
+  database: myapp
+
+production:
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  timeout: 5000
+  host: localhost
+  username: myapp
+  password: ""
+  database: myapp
+
+staging:
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  timeout: 5000
+  host: localhost
+  username: myapp
+  password: ""
+  database: myapp
