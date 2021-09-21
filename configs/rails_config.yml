@@ -112,8 +112,6 @@ jobs:
               exit 0
             fi
 
-            echo $AWS_ACCESS_KEY_ID
-            echo $AWS_SECRET_ACCESS_KEY
             yarn
             RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
             RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
