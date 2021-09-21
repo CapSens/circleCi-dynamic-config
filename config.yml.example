@@ -19,7 +19,7 @@ jobs:
             \"ruby-version\":\"2.6.6\",\
             \"bundler-version\":\"2.2.2\",\
             \"assets-bucket-staging\":\"myapp-staging-assets\",\
-            \"assets-bucket-production\":\"myapp-production-assets\",\
+            \"assets-bucket-production\":\"myapp-production-assets\"\
           }"
           configuration_path: dynamic_configs/configs/rails_config.yml
 
