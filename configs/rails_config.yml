@@ -213,7 +213,14 @@ workflows:
                   - ASSETS
                 filters:
                   branches:
-                    only: ['master', 'staging']
+                    only: ['staging']
+                requires: ['spec']
+            - assets:
+                context:
+                  - ASSETS
+                filters:
+                  branches:
+                    only: ['master']
                 requires: ['spec', 'security_check']
             - code_review:
                 filters:
