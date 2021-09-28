@@ -147,7 +147,7 @@ jobs:
               IGNORE="$IGNORE CVE-2020-15237"
             fi
             if [ -n "$IGNORE" ]; then
-              IGNORE="--ignore$IGNORE"
+              IGNORE="--ignore $IGNORE"
             fi
 
             bundle audit --update $IGNORE
