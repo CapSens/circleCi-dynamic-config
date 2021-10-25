@@ -22,6 +22,9 @@ parameters:
   install-redis:
     type: boolean
     default: false
+  install-tesseract:
+    type: boolean
+    default: false
   tests-parallelism:
     type: integer
     default: 1
@@ -54,6 +57,13 @@ commands: # a reusable command with parameters
                 command: |
                   apt-get install -y redis-server
                   service redis-server start
+      - when:
+          condition: << pipeline.parameters.install-tesseract >>
+          steps:
+            - run:
+                name: Tesseract OCR
+                command: |
+                  apt-get install -y tesseract-ocr
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
