@@ -55,7 +55,7 @@ commands: # a reusable command with parameters
             - run:
                 name: Redis
                 command: |
-                  apt-get install -y redis-server
+                  apt-get update --allow-releaseinfo-change && apt-get install -y --fix-missing redis-server
                   service redis-server start
       - when:
           condition: << pipeline.parameters.install-tesseract >>
