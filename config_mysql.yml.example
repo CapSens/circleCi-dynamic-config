@@ -1,0 +1,31 @@
+version: 2.1
+setup: true
+
+orbs:
+  continuation: circleci/continuation@0.1.2
+
+jobs:
+  generate-config:
+    executor: continuation/default
+    steps:
+      - checkout
+      - run:
+          name: Fetch circleCI config file
+          command: |
+            git clone git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
+      - continuation/continue:
+          parameters: "{\
+            \"project-name\":\"myapp\",\
+            \"ruby-version\":\"2.6.6\",\
+            \"bundler-version\":\"2.2.2\",\
+            \"assets-bucket-staging\":\"myapp-staging-assets\",\
+            \"assets-bucket-production\":\"myapp-production-assets\",\
+            \"install-redis\":false,\
+            \"install-tesseract\":false\
+          }"
+          configuration_path: dynamic_configs/configs/rails_config_mysql.yml
+
+workflows:
+  setup-workflow:
+    jobs:
+      - generate-config
