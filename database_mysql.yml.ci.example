@@ -1,0 +1,20 @@
+# username and database must have the value of project_name variable from .circleci/config.yml
+default: &default
+  adapter: mysql2
+  encoding: utf8
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  username: root
+  password: rootpw
+  host: 127.0.0.1
+  database: myapp
+  reconnect: true
+  wait_timeout: 2147483
+
+test:
+  <<: *default
+
+staging:
+  <<: *default
+
+production:
+  <<: *default
