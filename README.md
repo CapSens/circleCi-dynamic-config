@@ -7,7 +7,7 @@ It runs RSpec, handles the assets (Webpacker and Sprockets), and much more.
 1. Enable dynamic config for your project in CircleCI (Project Settings > Advanced > Enable dynamic config using setup workflows).
 2. Copy the file `config.yml.example` to your project's `.circleci/config.yml`.
 3. Choose the appropriate template file (e.g.: `configs/rails_config.yml`).
-4. If applicable, copy the file `database.yml.ci.example` to your project's `config/database.yml.ci`.
+4. If applicable, copy the file `database.yml.ci.example` (or `database_mysql.yml.ci.example` if you are using the MySQL template file `configs/rails_config_mysql.yml`) to your project's `config/database.yml.ci`.
 5. Adapt your `.circleci/config.yml` file with the appropriate parameters (the full list of available parameters can be found inside the template file).
     * The `project-name` config file parameter must match the `username` and `database` variables of the CI database file.
 
