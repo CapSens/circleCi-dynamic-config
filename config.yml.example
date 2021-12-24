@@ -19,6 +19,8 @@ jobs:
               "project-name": "myapp",
               "ruby-version": "2.6.6",
               "bundler-version": "2.2.2",
+              "branches-for-assets": ('staging' 'master:production' 'other-branch'),
+              "assets-buckets": "('myapp-staging-assets' 'myapp-production-assets' 'other-asset-bucket')",
               "assets-bucket-staging": "myapp-staging-assets",
               "assets-bucket-production": "myapp-production-assets",
               "install-redis": false,
