@@ -117,7 +117,6 @@ jobs:
           name: "Compile and serve assets"
           command: |
             branches=<< pipeline.parameters.branches-for-assets >>
-            echo ${branches[@]}
             assetsBuckets=<< pipeline.parameters.assets-buckets >>
             if [ ${#assetsBuckets[@]} -eq 0 ]; then
               assetsBuckets=('<< pipeline.parameters.assets-bucket-production >>' '<< pipeline.parameters.assets-bucket-staging >>')
@@ -130,10 +129,12 @@ jobs:
               fi
             done
 
-            if [ -z $ASSETS_ENV ]; then
+            if [[ -z "${ASSETS_ENV}" ]]; then
+              echo "ASSETS_ENV var has not been set. Skipping assets compilation."
+              exit 0
+            else
               echo "ready to compile assets for env $ASSETS_ENV on assets bucket $S3_ASSETS_BUCKET"
 
-              exit 0
               yarn
               RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
               RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
