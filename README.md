@@ -23,6 +23,22 @@ This config file requires two environment variables:
 
 To use this config, copy the file `config_with_per_env_credentials.yml.example` to your project's `.circleci/config.yml`.
 
+## Compile assets on other branches than staging and master
+
+If you use more than regular staging and production environment or you want to tell CircleCI to use other branches as base,
+it is possible to pass parameters like so in your `config.yml` file like so:
+
+```yaml
+\"branches-for-assets\":\"('staging' 'master:production' 'other-branch')\",\
+\"assets-buckets\":\"('myapp-staging-assets' 'myapp-production-assets' 'other-asset-bucket')\"
+```
+
+Be aware that `branches-for-assets` param takes a list of branches that you want the CI to compile on.
+Passing a branch name means that environment has the same name (example: `staging`)
+Passing two names separated by `:` means `BRANCH_NAME` `:` `ENVIRONMENT`
+Default value for `branches-for-assets` is `"('master:production' 'staging')"` so you don't have to send this param if
+you don't need more.
+
 ## Tests parallelism
 
 You can enable the tests parallelism by providing the `tests-parallelism` variable with a value greater than 1.
