@@ -10,7 +10,7 @@ It runs RSpec, handles the assets (Webpacker and Sprockets), and much more.
 4. If applicable, copy the file `database.yml.ci.example` (or `database_mysql.yml.ci.example` if you are using the MySQL template file `configs/rails_config_mysql.yml`) to your project's `config/database.yml.ci`.
 5. Adapt your `.circleci/config.yml` file with the appropriate parameters (the full list of available parameters can be found inside the template file).
     * The `project-name` config file parameter must match the `username` and `database` variables of the CI database file.
-6. Don't forget to activate your project on CircleCI (https://app.circleci.com/projects/project-dashboard/github/CapSens/ => "Set up Project")
+6. Don't forget to activate your project (if necessary) on CircleCI (https://app.circleci.com/projects/project-dashboard/github/CapSens/ => "Set up Project")
 
 ## Rails applications with per-environment encrypted credentials
 
