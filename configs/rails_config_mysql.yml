@@ -1,4 +1,6 @@
 version: 2.1
+orbs:
+  eb: circleci/aws-elastic-beanstalk@2.0.1
 
 parameters:
   project-name:
@@ -28,6 +30,30 @@ parameters:
   tests-parallelism:
     type: integer
     default: 1
+  precompile-assets:
+    type: boolean
+    default: true
+  deploy-on-beanstalk:
+    type: boolean
+    default: false
+  beanstalk-env-staging:
+    type: string
+    default: ""
+  beanstalk-app-staging:
+    type: string
+    default: ""
+  beanstalk-env-production:
+    type: string
+    default: ""
+  beanstalk-app-production:
+    type: string
+    default: ""
+  custom-deploy-branch:
+    type: string
+    default: ""
+  beanstalk-platform-version:
+    type: string
+    default: ""
 
 commands: # a reusable command with parameters
   setup_env:
@@ -103,32 +129,38 @@ jobs:
           MYSQL_USER: << pipeline.parameters.project-name >>
           MYSQL_PASSWORD: << pipeline.parameters.project-name >>
     steps:
-      - setup_env
       - run:
-          name: "Compile and serve assets"
-          command: |
-            if [ $CIRCLE_BRANCH == staging ]
-            then
-              export ASSETS_ENV=staging
-              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-staging >>
-            elif [ $CIRCLE_BRANCH == master ]
-            then
-              export ASSETS_ENV=production
-              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-production >>
-            else
-              exit 0
-            fi
+          name: "empty step"
+          command: "echo ok"
+      - when:
+          condition: << pipeline.parameters.precompile-assets >>
+          steps:
+            - setup_env
+            - run:
+                name: "Compile and serve assets"
+                command: |
+                  if [ $CIRCLE_BRANCH == staging ]
+                  then
+                    export ASSETS_ENV=staging
+                    export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-staging >>
+                  elif [ $CIRCLE_BRANCH == master ]
+                  then
+                    export ASSETS_ENV=production
+                    export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-production >>
+                  else
+                    exit 0
+                  fi
 
-            yarn
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
-            aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read
+                  yarn
+                  RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
+                  RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
+                  aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read
 
-            if [ -d "public/packs" ]; then
-              aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read
-            else
-              echo "No public/packs directory, skipping packs upload."
-            fi
+                  if [ -d "public/packs" ]; then
+                    aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read
+                  else
+                    echo "No public/packs directory, skipping packs upload."
+                  fi
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
@@ -166,6 +198,17 @@ jobs:
             brakeman -o security/brakeman.html || true
       - store_artifacts:
           path: security/brakeman.html
+  beanstalk-deploy-asked:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          RAILS_ENV: test
+    steps:
+      - run:
+          name: Check if deployment is required
+          command: "[ << pipeline.parameters.deploy-on-beanstalk >> = true ]"
+
 workflows:
     version: 2
     'workflow':
@@ -179,3 +222,27 @@ workflows:
                   branches:
                     only: ['master', 'staging']
                 requires: ['spec', 'security_check']
+            - beanstalk-deploy-asked:
+                filters:
+                  branches:
+                    only: [master, staging, << pipeline.parameters.custom-deploy-branch >>]
+                requires: ['spec', 'security_check']
+            - eb/deploy:
+                name: eb-deploy-staging
+                context: AWS_BEANSTALK
+                application-name: << pipeline.parameters.beanstalk-app-staging >>
+                environment-name: << pipeline.parameters.beanstalk-env-staging >>
+                filters:
+                  branches:
+                    only: [staging]
+                platform-version: << pipeline.parameters.beanstalk-platform-version >>
+                requires: ["beanstalk-deploy-asked"]
+            - eb/deploy:
+                context: AWS_BEANSTALK
+                application-name: << pipeline.parameters.beanstalk-app-production >>
+                environment-name: << pipeline.parameters.beanstalk-env-production >>
+                filters:
+                  branches:
+                    only: [master, main]
+                platform-version: << pipeline.parameters.beanstalk-platform-version >>
+                requires: ["beanstalk-deploy-asked"]
