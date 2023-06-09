@@ -154,10 +154,10 @@ jobs:
                   yarn
                   RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
                   RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
-                  aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read
+                  aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
 
                   if [ -d "public/packs" ]; then
-                    aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read
+                    aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
                   else
                     echo "No public/packs directory, skipping packs upload."
                   fi
