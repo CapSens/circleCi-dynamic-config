@@ -28,6 +28,9 @@ parameters:
   tests-parallelism:
     type: integer
     default: 1
+  resource-class:
+    type: string
+    default: "large"
 
 commands: # a reusable command with parameters
   setup_env:
@@ -70,6 +73,7 @@ commands: # a reusable command with parameters
 jobs:
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
     docker:
       - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
@@ -93,6 +97,7 @@ jobs:
             bundle exec rspec $(cat /tmp/tests-to-run)
   assets:
     working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
     docker:
       - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
@@ -134,6 +139,7 @@ jobs:
             fi
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
     docker:
       - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
