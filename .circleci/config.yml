@@ -8,7 +8,7 @@ jobs:
       - checkout
       - run:
           name: Config circleCi CLI
-          command: circleci setup --no-prompt --host https://circleci.com --token ${CIRCLE_CI_TOKEN}
+          command: circleci setup --no-prompt --host https://circleci.com
       - run:
           name: Validate configurations
           command: |
