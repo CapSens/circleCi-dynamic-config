@@ -30,7 +30,7 @@ parameters:
     default: 1
   resource-class:
     type: string
-    default: "large"
+    default: "medium"
 
 commands: # a reusable command with parameters
   setup_env:
@@ -97,7 +97,7 @@ jobs:
             bundle exec rspec $(cat /tmp/tests-to-run)
   assets:
     working_directory: ~/<< pipeline.parameters.project-name >>
-    resource_class: << pipeline.parameters.resource-class >>
+    resource_class: small
     docker:
       - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
@@ -139,7 +139,7 @@ jobs:
             fi
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
-    resource_class: << pipeline.parameters.resource-class >>
+    resource_class: small
     docker:
       - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
