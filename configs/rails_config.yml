@@ -31,6 +31,9 @@ parameters:
   resource-class:
     type: string
     default: "medium"
+  assets-resource-class: # platforms with webpacker needs a bigger instance than small
+    type: string
+    default: "small"
 
 commands: # a reusable command with parameters
   setup_env:
@@ -97,7 +100,7 @@ jobs:
             bundle exec rspec $(cat /tmp/tests-to-run)
   assets:
     working_directory: ~/<< pipeline.parameters.project-name >>
-    resource_class: small
+    resource_class: << pipeline.parameters.assets-resource-class >>
     docker:
       - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
         environment:
