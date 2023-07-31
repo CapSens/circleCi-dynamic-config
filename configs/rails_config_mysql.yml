@@ -232,9 +232,6 @@ workflows:
             - assets:
                 context:
                   - ASSETS
-                filters:
-                  branches:
-                    only: ['master', 'staging']
                 requires: ['spec', 'security_check']
             - beanstalk-deploy-asked:
                 filters:
