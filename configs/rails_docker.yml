@@ -1,0 +1,63 @@
+version: 2.1
+setup: true
+
+jobs:
+  build:
+    working_directory: /tmp/app
+    environment:
+      DOCKER_REGISTRY: 396522184519.dkr.ecr.eu-west-1.amazonaws.com
+    docker:
+      - image: cimg/aws:2023.09
+    steps:
+      - checkout
+      - setup_remote_docker
+      - restore_cache:
+          keys:
+            - v1-{{ .Branch }}
+          paths:
+            - /tmp/caches/app.tar
+      - run:
+          name: Load Docker image layer cache
+          command: |
+            set +o pipefail
+            docker load -i /tmp/caches/app.tar | true
+      - run:
+          name: Debug variables
+          command: |
+            echo "Docker Image name (manual): ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}"
+            echo "Github name: ${GITHUB_TOKEN}"
+      - run:
+          name: Build application Docker image
+          command: |
+            docker build -t "${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}" \
+              --build-arg RUBY_VERSION=3.2.2 \
+              --build-arg RAILS_VERSION=7.0.0 \
+              --build-arg NODE_MAJOR=16 \
+              --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+              --file ./.dockerdev/Dockerfile \
+              .
+      - run:
+          name: Save Docker image layer cache
+          command: |
+            mkdir -p /tmp/caches
+            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}
+      - save_cache:
+          key: v1-{{ .Branch }}-{{ epoch }}
+          paths:
+            - /tmp/caches/app.tar
+      - deploy:
+          name: Push application Docker image
+          command: |
+            # if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              rm -rf ~/.aws
+              aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+              docker push ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}
+            # fi
+
+workflows:
+  setup-workflow:
+    jobs:
+      - build:
+          context:
+            - Github
+            - AWS_ECR
