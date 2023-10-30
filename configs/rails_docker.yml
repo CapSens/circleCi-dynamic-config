@@ -22,11 +22,6 @@ jobs:
             set +o pipefail
             docker load -i /tmp/caches/app.tar | true
       - run:
-          name: Debug variables
-          command: |
-            echo "Docker Image name (manual): ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}"
-            echo "Github name: ${GITHUB_TOKEN}"
-      - run:
           name: Build application Docker image
           command: |
             docker build -t "${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}" \
