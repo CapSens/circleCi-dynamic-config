@@ -22,7 +22,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   curl \
   less \
   git \
-  libjemalloc2
+  libjemalloc2 \
+  xz-utils
 
 # Install postgres
 ARG PG_MAJOR
@@ -42,8 +43,9 @@ ARG NODE_MAJOR=16
 RUN apt-get install -y ca-certificates curl gnupg --no-install-recommends \
   && mkdir -p /etc/apt/keyrings \
   && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
   && apt-get update \
-  && apt-get install nodejs npm -y --no-install-recommends \
+  && apt-get install nodejs -y --no-install-recommends \
   && npm install -g yarn
 
 # Install Imagemagick
@@ -162,7 +164,10 @@ ENV SECRET_KEY_BASE=foo \
   S3_BUCKET=foo \
   S3_SECRET=foo
 
-ENV DATABASE_NAME=fake_database_name
+ENV DB_NAME=fake_database_name
+# Copy database config to avoid human errors
+COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
+
 RUN bundle exec rails assets:precompile
 
 # Finally, our production image definition
@@ -220,12 +225,14 @@ EXPOSE 3000
 # Copy code
 COPY --chown=my_user:my_user . .
 
+# Copy database config to avoid human errors
+COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
+
 # Copy artifacts
 # 1) Installed gems
 COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
 # 2) Compiled assets
 COPY --from=production-builder /home/my_user/app/public/assets /home/my_user/app/public/assets
-COPY --from=production-builder /home/my_user/app/node_modules /home/my_user/app/node_modules
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
 COPY --chown=my_user:my_user --from=production-builder /home/my_user/app/tmp/cache/bootsnap* /home/my_user/app/tmp/cache/
 

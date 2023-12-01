@@ -1,5 +1,4 @@
 version: 2.1
-setup: true
 
 jobs:
   build:
@@ -22,20 +21,26 @@ jobs:
             set +o pipefail
             docker load -i /tmp/caches/app.tar | true
       - run:
+          name: Download shared Dockerfile and utils
+          command: |
+            git clone --depth 1 --branch test-ci-build git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
+            cp -R dynamic_configs/.dockerdev ./
+            rm -rf dynamic_configs
+      - run:
           name: Build application Docker image
           command: |
-            docker build -t "${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}" \
+            docker build -t "${DOCKER_REGISTRY}/capsens_talent:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
               --build-arg RUBY_VERSION=3.2.2 \
               --build-arg RAILS_VERSION=7.0.0 \
               --build-arg NODE_MAJOR=16 \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
-              --file ./.dockerdev/Dockerfile \
+              --file .dockerdev/Dockerfile \
               .
       - run:
           name: Save Docker image layer cache
           command: |
             mkdir -p /tmp/caches
-            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}
+            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/capsens_talent:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
       - save_cache:
           key: v1-{{ .Branch }}-{{ epoch }}
           paths:
@@ -46,13 +51,14 @@ jobs:
             # if [ "${CIRCLE_BRANCH}" == "master" ]; then
               rm -rf ~/.aws
               aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
-              docker push ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}
+              docker push ${DOCKER_REGISTRY}/capsens_talent:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
             # fi
 
 workflows:
-  setup-workflow:
+  version: 2
+  'workflow':
     jobs:
-      - build:
-          context:
-            - Github
-            - AWS_ECR
+        - build:
+            context:
+              - Github
+              - AWS_ECR
