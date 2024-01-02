@@ -10,12 +10,6 @@ parameters:
   bundler-version:
     type: string
     default: "2.2.16"
-  branches-for-assets:
-    type: string
-    default: "('master:production' 'staging')" # add any branch you want assets to be compiled on
-  assets-buckets:
-    type: string
-    default: "()" # must match branches-for-assets size and order, if not filled, it will be (assets-bucket-production assets-bucket-staging)
   assets-bucket-staging:
     type: string
     default: ""
@@ -40,6 +34,15 @@ parameters:
   assets-resource-class: # platforms with webpacker needs a bigger instance than small
     type: string
     default: "small"
+  clever-cloud-app-staging:
+    type: string
+    default: ""
+  clever-cloud-app-production:
+    type: string
+    default: ""
+  deploy-on-clever-cloud:
+    type: boolean
+    default: false
 
 commands: # a reusable command with parameters
   setup_env:
@@ -79,6 +82,7 @@ commands: # a reusable command with parameters
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
+
 jobs:
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -125,35 +129,27 @@ jobs:
       - run:
           name: "Compile and serve assets"
           command: |
-            branches=<< pipeline.parameters.branches-for-assets >>
-            assetsBuckets=<< pipeline.parameters.assets-buckets >>
-            if [ ${#assetsBuckets[@]} -eq 0 ]; then
-              assetsBuckets=('<< pipeline.parameters.assets-bucket-production >>' '<< pipeline.parameters.assets-bucket-staging >>')
+            if [ $CIRCLE_BRANCH == staging ]
+            then
+              export ASSETS_ENV=staging
+              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-staging >>
+            elif [ $CIRCLE_BRANCH == master ]
+            then
+              export ASSETS_ENV=production
+              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-production >>
+            else
+              exit 0
             fi
 
-            for i in "${!branches[@]}"; do
-              if [ $CIRCLE_BRANCH == ${branches[$i]%%:*} ]; then
-                export ASSETS_ENV=${branches[$i]##*:}
-                export S3_ASSETS_BUCKET=${assetsBuckets[$i]}
-              fi
-            done
+            yarn
+            RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
+            RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
+            aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
 
-            if [[ -z "${ASSETS_ENV}" ]]; then
-              echo "ASSETS_ENV var has not been set. Skipping assets compilation."
-              exit 0
+            if [ -d "public/packs" ]; then
+              aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
             else
-              echo "ready to compile assets for env $ASSETS_ENV on assets bucket $S3_ASSETS_BUCKET"
-
-              yarn
-              RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
-              RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
-              aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
-
-              if [ -d "public/packs" ]; then
-                aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
-              else
-                echo "No public/packs directory, skipping packs upload."
-              fi
+              echo "No public/packs directory, skipping packs upload."
             fi
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -181,7 +177,6 @@ jobs:
               IGNORE="$IGNORE CVE-2020-15237"
             fi
             IGNORE="$IGNORE CVE-2023-26141"
-            IGNORE="$IGNORE CVE-2023-51763"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
@@ -195,6 +190,44 @@ jobs:
             brakeman -o security/brakeman.html || true
       - store_artifacts:
           path: security/brakeman.html
+  clever_cloud_deploy:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: small
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+    steps:
+      - checkout
+      - run:
+          name: clever deploy
+          command: |
+            if [ << pipeline.parameters.deploy-on-clever-cloud >> = false ]
+            then
+              echo "Clever Cloud deploy not required for this platform"
+              exit 0
+            fi
+
+            if [ $CIRCLE_BRANCH == staging ]
+            then
+              export CLEVER_APP_ID=<< pipeline.parameters.clever-cloud-app-staging >>
+            elif [ $CIRCLE_BRANCH == master ]
+            then
+              export CLEVER_APP_ID=<< pipeline.parameters.clever-cloud-app-production >>
+            fi
+
+            # CLEVER_SSH_KEY variable can be generated with the commande : `cat /path/to/private/key | sed 's/$/\\n/' | tr -d '\n'`
+            echo $CLEVER_SSH_KEY | sed 's/\\n/\n/g' > ~/.ssh/clever
+            chmod 400 ~/.ssh/clever
+            ssh-add ~/.ssh/clever
+
+            if [ ! -n "$(grep "^push-n2-par-clevercloud-customers" ~/.ssh/known_hosts)" ]
+            then
+              ssh-keyscan push-n2-par-clevercloud-customers.services.clever-cloud.com >> ~/.ssh/known_hosts 2>/dev/null
+            fi
+
+            git config user.email "infra@capsens"
+            git remote add clever git+ssh://git@push-n2-par-clevercloud-customers.services.clever-cloud.com/$CLEVER_APP_ID.git
+            git push -u clever $CIRCLE_BRANCH:master --force
+
 workflows:
     version: 2
     'workflow':
@@ -203,5 +236,14 @@ workflows:
             - security_check
             - assets:
                 context:
-                  - ASSETS
+                  - CLEVER_CLOUD
+                filters:
+                  branches:
+                    only: [master, staging]
                 requires: ['spec', 'security_check']
+            - clever_cloud_deploy:
+                context: CLEVER_CLOUD
+                filters:
+                  branches:
+                    only: [master, staging]
+                requires: ['assets']

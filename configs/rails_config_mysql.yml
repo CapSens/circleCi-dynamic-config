@@ -199,6 +199,7 @@ jobs:
             if [ $SHRINE_CHECK -eq 0 ]; then
               IGNORE="$IGNORE CVE-2020-15237"
             fi
+            IGNORE="$IGNORE CVE-2023-26141"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi

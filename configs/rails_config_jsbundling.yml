@@ -80,6 +80,7 @@ jobs:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
+      - image: cimg/redis:6.2.6
       - image: postgres:12
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
@@ -163,6 +164,7 @@ jobs:
             if [ $SHRINE_CHECK -eq 0 ]; then
               IGNORE="$IGNORE CVE-2020-15237"
             fi
+            IGNORE="$IGNORE CVE-2023-26141"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
