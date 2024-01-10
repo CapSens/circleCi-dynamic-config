@@ -1,5 +1,20 @@
 version: 2.1
 
+parameters:
+  project-name:
+    type: string
+    required: true
+  ruby-version:
+    type: string
+    required: true
+  bundler-version:
+    type: string
+    required: true
+  # TODO: check if this parameter can be removed
+  rails-version:
+    type: string
+    required: true
+
 jobs:
   build:
     working_directory: /tmp/app
@@ -29,9 +44,9 @@ jobs:
       - run:
           name: Build application Docker image
           command: |
-            docker build -t "${DOCKER_REGISTRY}/capsens_talent:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
-              --build-arg RUBY_VERSION=3.2.2 \
-              --build-arg RAILS_VERSION=7.0.0 \
+            docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
+              --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
+              --build-arg RAILS_VERSION=<< pipeline.parameters.rails-version >> \
               --build-arg NODE_MAJOR=16 \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
               --file .dockerdev/Dockerfile \
@@ -40,7 +55,7 @@ jobs:
           name: Save Docker image layer cache
           command: |
             mkdir -p /tmp/caches
-            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/capsens_talent:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
       - save_cache:
           key: v1-{{ .Branch }}-{{ epoch }}
           paths:
@@ -51,7 +66,7 @@ jobs:
             # if [ "${CIRCLE_BRANCH}" == "master" ]; then
               rm -rf ~/.aws
               aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
-              docker push ${DOCKER_REGISTRY}/capsens_talent:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+              docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
             # fi
 
 workflows:
