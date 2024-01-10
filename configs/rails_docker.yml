@@ -3,13 +3,17 @@ version: 2.1
 parameters:
   project-name:
     type: string
+    default: "my-project"
   ruby-version:
     type: string
+    default: "3.2.2"
   bundler-version:
     type: string
+    default: "2.4.10"
   # TODO: check if this parameter can be removed
   rails-version:
     type: string
+    default: "7.0.0"
 
 jobs:
   build:
