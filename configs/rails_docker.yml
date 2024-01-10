@@ -3,17 +3,13 @@ version: 2.1
 parameters:
   project-name:
     type: string
-    required: true
   ruby-version:
     type: string
-    required: true
   bundler-version:
     type: string
-    required: true
   # TODO: check if this parameter can be removed
   rails-version:
     type: string
-    required: true
 
 jobs:
   build:
