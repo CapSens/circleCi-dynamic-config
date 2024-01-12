@@ -158,6 +158,10 @@ RUN yarn install --check-files
 # Copy code
 COPY --chown=my_user:my_user . .
 
+ARG REQUIRED_VARIABLES
+
+RUN echo "REQUIRED_VARIABLES: $REQUIRED_VARIABLES"
+
 # Precompile assets
 # NOTE: The command may require adding some environment variables (e.g., SECRET_KEY_BASE) if you're not using
 # credentials.
