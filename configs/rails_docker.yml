@@ -16,8 +16,10 @@ parameters:
     default: "7.0.0"
   assets-bucket-staging:
     type: string
+    default: ""
   assets-bucket-production:
     type: string
+    default: ""
 
 jobs:
   build:
