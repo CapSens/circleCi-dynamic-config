@@ -53,7 +53,7 @@ jobs:
               --build-arg NODE_MAJOR=16 \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
               --build-arg GITHUB_TOKEN_DEV=${GITHUB_TOKEN_DEV} \
-              --build-arg REQUIRED_VARIABLES=<< pipeline.parameters.required-variables >> \
+              --build-arg REQUIRED_VARIABLES="<< pipeline.parameters.required-variables >>" \
               --file .dockerdev/Dockerfile \
               .
       - run:
