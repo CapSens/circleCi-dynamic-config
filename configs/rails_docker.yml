@@ -76,7 +76,7 @@ jobs:
                 suffix="${CIRCLE_BRANCH}"
                 ;;
             esac && \
-            aws s3 cp ./public-assets s3://<< pipeline.parameters.assets-bucket-${suffix} >>/ --recursive && \
+            aws s3 cp ./public-assets s3://<< pipeline.parameters.assets-bucket- >>${suffix}/ --recursive && \
             docker rm -v $id
       - run:
           name: Save Docker image layer cache
