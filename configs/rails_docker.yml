@@ -64,11 +64,11 @@ jobs:
             docker cp $id:/home/my_user/app/public/assets public-assets && \
             rm public-assets/manifest.json && \
             if [ "${CIRCLE_BRANCH}" == "staging" ]; then
-              echo << parameters.assets-bucket-staging >> && \
-              aws s3 cp ./public-assets s3://<< parameters.assets-bucket-staging >>/ --recursive && \
+              echo << pipeline.parameters.assets-bucket-staging >> && \
+              aws s3 cp ./public-assets s3://<< pipeline.parameters.assets-bucket-staging >>/ --recursive && \
             else if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              echo << parameters.assets-bucket-production >> && \
-              aws s3 cp ./public-assets s3://<< parameters.assets-bucket-production >>/ --recursive && \
+              echo << pipeline.parameters.assets-bucket-production >> && \
+              aws s3 cp ./public-assets s3://<< pipeline.parameters.assets-bucket-production >>/ --recursive && \
             fi
             docker rm -v $id
       - run:
