@@ -45,7 +45,7 @@ jobs:
       - run:
           name: Download shared Dockerfile and utils
           command: |
-            git clone --depth 1 --branch test-ci-build git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
+            git clone --depth 1 --branch improve-container git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
             cp -R dynamic_configs/.dockerdev ./
             rm -rf dynamic_configs
       - run:
