@@ -67,11 +67,11 @@ jobs:
           command: |
             id=$(docker create ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}) && \
             docker cp $id:/home/my_user/app/public/assets public-assets && \
-            rm public-assets/manifest.json && \
+            rm public-assets/manifest.json
             if [ "${CIRCLE_BRANCH}" == "staging" ]; then
               echo << pipeline.parameters.assets-bucket-staging >>
               aws s3 cp ./public-assets s3://<< pipeline.parameters.assets-bucket-staging >>/ --recursive
-            else if [ "${CIRCLE_BRANCH}" == "master" ]; then
+            elif [ "${CIRCLE_BRANCH}" == "master" ]; then
               echo << pipeline.parameters.assets-bucket-production >>
               aws s3 cp ./public-assets s3://<< pipeline.parameters.assets-bucket-production >>/ --recursive
             fi
