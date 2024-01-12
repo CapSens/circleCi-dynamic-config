@@ -121,7 +121,10 @@ USER my_user
 RUN mkdir /home/my_user/app
 WORKDIR /home/my_user/app
 
-ARG GITHUB_TOKEN
+# Only for testing purposes
+ARG GITHUB_TOKEN_DEV
+
+# ARG GITHUB_TOKEN
 # Then, we re-configure Bundler
 ENV RAILS_ENV=staging \
   LANG=C.UTF-8 \
@@ -130,7 +133,7 @@ ENV RAILS_ENV=staging \
   BUNDLE_APP_CONFIG=/home/my_user/bundle \
   BUNDLE_PATH=/home/my_user/bundle \
   GEM_HOME=/home/my_user/bundle \
-  BUNDLE_GITHUB__COM=x-access-token:"$GITHUB_TOKEN" \
+  BUNDLE_GITHUB__COM=x-access-token:"$GITHUB_TOKEN_DEV" \
   LD_PRELOAD=libjemalloc.so.2
 
 # Install Ruby gems

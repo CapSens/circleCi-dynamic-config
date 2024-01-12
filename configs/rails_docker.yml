@@ -49,6 +49,7 @@ jobs:
               --build-arg RAILS_VERSION=<< pipeline.parameters.rails-version >> \
               --build-arg NODE_MAJOR=16 \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+              --build-arg GITHUB_TOKEN_DEV=${GITHUB_TOKEN_DEV} \
               --file .dockerdev/Dockerfile \
               .
       - run:
@@ -75,5 +76,7 @@ workflows:
     jobs:
         - build:
             context:
+              # Onlly for testing purpose
+              - GithubDev
               - Github
               - AWS_ECR
