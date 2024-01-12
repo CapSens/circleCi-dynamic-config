@@ -14,6 +14,10 @@ parameters:
   rails-version:
     type: string
     default: "7.0.0"
+  assets-bucket-staging:
+    type: string
+  assets-bucket-production:
+    type: string
 
 jobs:
   build:
