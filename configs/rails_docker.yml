@@ -70,13 +70,16 @@ jobs:
             rm public-assets/manifest.json && \
             case "${CIRCLE_BRANCH}" in
               master)
-                suffix="production"
+                bucket=<< pipeline.parameters.assets-bucket-production >>
+                ;;
+              staging)
+                bucket=<< pipeline.parameters.assets-bucket-staging >>
                 ;;
               *)
-                suffix="${CIRCLE_BRANCH}"
+                bucket="empty"
                 ;;
             esac && \
-            aws s3 cp ./public-assets s3://<< pipeline.parameters.assets-bucket- >>${suffix}/ --recursive && \
+            aws s3 cp ./public-assets s3://{bucket}/assets/ --recursive && \
             docker rm -v $id
       - run:
           name: Save Docker image layer cache
