@@ -130,7 +130,7 @@ ENV RAILS_ENV=staging \
   BUNDLE_APP_CONFIG=/home/my_user/bundle \
   BUNDLE_PATH=/home/my_user/bundle \
   GEM_HOME=/home/my_user/bundle \
-  BUNDLE_GITHUB__COM="x-access-token:${GITHUB_TOKEN}" \
+  BUNDLE_GITHUB__COM=${GITHUB_TOKEN} \
   LD_PRELOAD=libjemalloc.so.2
 
 # Install Ruby gems
