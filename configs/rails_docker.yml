@@ -86,7 +86,7 @@ jobs:
           key: v1-{{ .Branch }}-{{ epoch }}
           paths:
             - /tmp/caches/app.tar
-      - deploy:
+      - run:
           name: Push application Docker image
           command: |
             # if [ "${CIRCLE_BRANCH}" == "master" ]; then
