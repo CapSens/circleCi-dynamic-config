@@ -130,12 +130,14 @@ ENV RAILS_ENV=staging \
   BUNDLE_APP_CONFIG=/home/my_user/bundle \
   BUNDLE_PATH=/home/my_user/bundle \
   GEM_HOME=/home/my_user/bundle \
-  BUNDLE_GITHUB__COM=${GITHUB_TOKEN} \
+  BUNDLE_GITHUB__COM=x-access-token:"$GITHUB_TOKEN" \
   LD_PRELOAD=libjemalloc.so.2
-
 
 # Install Ruby gems
 COPY --chown=my_user:my_user Gemfile Gemfile.lock ./
+
+RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
+
 RUN mkdir $BUNDLE_PATH \
   && bundle config --local deployment 'true' \
   && bundle config --local path "${BUNDLE_PATH}" \
