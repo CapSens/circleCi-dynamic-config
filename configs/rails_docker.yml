@@ -79,7 +79,7 @@ jobs:
                 bucket="empty"
                 ;;
             esac && \
-            aws s3 cp ./public-assets s3://{bucket}/assets/ --recursive && \
+            aws s3 cp ./public-assets s3://${bucket}/assets/ --recursive && \
             docker rm -v $id
       - run:
           name: Save Docker image layer cache
