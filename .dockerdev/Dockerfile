@@ -174,6 +174,7 @@ ENV DB_NAME=fake_database_name
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 
 ARG REQUIRED_VARIABLES
+RUN echo "REQUIRED_VARIABLES: $REQUIRED_VARIABLES"
 RUN for required_variable in $REQUIRED_VARIABLES; do \
     export "$required_variable=foo" ; \
     done; \
