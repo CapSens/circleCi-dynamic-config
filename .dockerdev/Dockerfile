@@ -158,10 +158,6 @@ RUN yarn install --check-files
 # Copy code
 COPY --chown=my_user:my_user . .
 
-ARG REQUIRED_VARIABLES
-
-RUN echo "REQUIRED_VARIABLES: $REQUIRED_VARIABLES"
-
 # Precompile assets
 # NOTE: The command may require adding some environment variables (e.g., SECRET_KEY_BASE) if you're not using
 # credentials.
@@ -177,7 +173,11 @@ ENV DB_NAME=fake_database_name
 # Copy database config to avoid human errors
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 
-RUN bundle exec rails assets:precompile
+ARG REQUIRED_VARIABLES
+RUN for required_variable in $REQUIRED_VARIABLES; do \
+    export "$required_variable=foo" ; \
+    done; \
+    bundle exec rails assets:precompile
 
 # Finally, our production image definition
 # NOTE: It's not extending the base image, it's a new one
