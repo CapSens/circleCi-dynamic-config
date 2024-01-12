@@ -15,8 +15,8 @@ parameters:
     type: string
     default: "7.0.0"
   required-variables:
-    type: array
-    default: []
+    type: string
+    default: ""
 
 jobs:
   build:
