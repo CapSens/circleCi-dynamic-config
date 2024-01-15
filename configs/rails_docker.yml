@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  terraform: circleci/terraform@3.1.0
+
 parameters:
   project-name:
     type: string
@@ -33,52 +36,52 @@ jobs:
       - image: cimg/aws:2023.09
     steps:
       - checkout
-      - setup_remote_docker
-      - restore_cache:
-          keys:
-            - v1-{{ .Branch }}
-          paths:
-            - /tmp/caches/app.tar
-      - run:
-          name: Load Docker image layer cache
-          command: |
-            set +o pipefail
-            docker load -i /tmp/caches/app.tar | true
-      - run:
-          name: Download shared Dockerfile and utils
-          command: |
-            git clone --depth 1 --branch test-ci-build-vic git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
-            cp -R dynamic_configs/.dockerdev ./
-            rm -rf dynamic_configs
-      - run:
-          name: Build application Docker image
-          command: |
-            docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
-              --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
-              --build-arg RAILS_VERSION=<< pipeline.parameters.rails-version >> \
-              --build-arg NODE_MAJOR=16 \
-              --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
-              --build-arg GITHUB_TOKEN_DEV=${GITHUB_TOKEN_DEV} \
-              --build-arg REQUIRED_VARIABLES="<< pipeline.parameters.required-variables >>" \
-              --file .dockerdev/Dockerfile \
-              .
-      - run:
-          name: Save Docker image layer cache
-          command: |
-            mkdir -p /tmp/caches
-            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
-      - save_cache:
-          key: v1-{{ .Branch }}-{{ epoch }}
-          paths:
-            - /tmp/caches/app.tar
-      - deploy:
-          name: Push application Docker image
-          command: |
-            # if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              rm -rf ~/.aws
-              aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
-              docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
-            # fi
+      # - setup_remote_docker
+      # - restore_cache:
+      #     keys:
+      #       - v1-{{ .Branch }}
+      #     paths:
+      #       - /tmp/caches/app.tar
+      # - run:
+      #     name: Load Docker image layer cache
+      #     command: |
+      #       set +o pipefail
+      #       docker load -i /tmp/caches/app.tar | true
+      # - run:
+      #     name: Download shared Dockerfile and utils
+      #     command: |
+      #       git clone --depth 1 --branch test-ci-build-vic git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
+      #       cp -R dynamic_configs/.dockerdev ./
+      #       rm -rf dynamic_configs
+      # - run:
+      #     name: Build application Docker image
+      #     command: |
+      #       docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
+      #         --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
+      #         --build-arg RAILS_VERSION=<< pipeline.parameters.rails-version >> \
+      #         --build-arg NODE_MAJOR=16 \
+      #         --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+      #         --build-arg GITHUB_TOKEN_DEV=${GITHUB_TOKEN_DEV} \
+      #         --build-arg REQUIRED_VARIABLES="<< pipeline.parameters.required-variables >>" \
+      #         --file .dockerdev/Dockerfile \
+      #         .
+      # - run:
+      #     name: Save Docker image layer cache
+      #     command: |
+      #       mkdir -p /tmp/caches
+      #       docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+      # - save_cache:
+      #     key: v1-{{ .Branch }}-{{ epoch }}
+      #     paths:
+      #       - /tmp/caches/app.tar
+      # - deploy:
+      #     name: Push application Docker image
+      #     command: |
+      #       # if [ "${CIRCLE_BRANCH}" == "master" ]; then
+      #         rm -rf ~/.aws
+      #         aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+      #         docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+      #       # fi
   deploy:
     docker:
       - image: cimg/aws:2023.09
@@ -87,6 +90,17 @@ jobs:
           name: Deploy docker image
           command: |
             echo "Deploy docker image"
+
+      - run:
+          name: Clone Terraform repository
+          command: |
+            git clone git@github.com:CapSens/terraform-infra.git terraform_infra
+
+      # - run:
+      #     name: Terraform init
+      #     command: |
+      #       cd terraform_infra
+      #       make init project=rails_application
 
 workflows:
   version: 2
@@ -109,8 +123,12 @@ workflows:
               - GithubDev
               - Github
               - AWS_ECR
-
-      # - deploy
+        - deploy:
+            context:
+              # Onlly for testing purpose
+              - GithubDev
+              - Github
+              - AWS_ECR
 
   deploy:
     when: << pipeline.parameters.deploy >>
