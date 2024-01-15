@@ -17,6 +17,12 @@ parameters:
   required-variables:
     type: string
     default: ""
+  build-and-deploy:
+    type: boolean
+    default: false
+  deploy:
+    type: boolean
+    default: false
 
 jobs:
   build:
@@ -73,12 +79,43 @@ jobs:
               aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
               docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
             # fi
+  deploy:
+    docker:
+      - image: cimg/aws:2023.09
+    steps:
+      - run:
+          name: Deploy docker image
+          command: |
+            echo "Deploy docker image"
 
 workflows:
   version: 2
+
   'workflow':
     jobs:
         - build:
+            context:
+              # Onlly for testing purpose
+              - GithubDev
+              - Github
+              - AWS_ECR
+
+  build-and-deploy:
+    when: << pipeline.parameters.build-and-deploy >>
+    jobs:
+        - build:
+            context:
+              # Onlly for testing purpose
+              - GithubDev
+              - Github
+              - AWS_ECR
+
+      # - deploy
+
+  deploy:
+    when: << pipeline.parameters.deploy >>
+    jobs:
+        - deploy:
             context:
               # Onlly for testing purpose
               - GithubDev
