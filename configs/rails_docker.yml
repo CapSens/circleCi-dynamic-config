@@ -105,7 +105,12 @@ jobs:
 workflows:
   version: 2
 
-  'workflow':
+  workflow:
+    when:
+      and:
+        - equal: [ false, << pipeline.parameters.build-and-deploy >> ]
+        - equal: [ false, << pipeline.parameters.deploy >> ]
+
     jobs:
         - build:
             context:
