@@ -83,6 +83,7 @@ jobs:
       #         docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
       #       # fi
   deploy:
+    working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
       - image: cimg/aws:2023.09
     steps:
