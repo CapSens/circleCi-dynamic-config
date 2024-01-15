@@ -86,6 +86,7 @@ jobs:
     docker:
       - image: cimg/aws:2023.09
     steps:
+      - checkout
       - run:
           name: Deploy docker image
           command: |
