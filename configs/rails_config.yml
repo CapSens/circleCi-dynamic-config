@@ -34,6 +34,9 @@ parameters:
   assets-resource-class: # platforms with webpacker needs a bigger instance than small
     type: string
     default: "small"
+  js-framework:
+    type: string
+    default: sprockets
 
 commands: # a reusable command with parameters
   setup_env:
@@ -98,6 +101,10 @@ jobs:
           command: |
             yarn
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
+            if [ << pipeline.parameters.js-framework >> == esbuild ]
+            then
+              bin/rails javascript:build
+            fi
             bundle exec rspec $(cat /tmp/tests-to-run)
   assets:
     working_directory: ~/<< pipeline.parameters.project-name >>
