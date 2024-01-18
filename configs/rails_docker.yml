@@ -124,7 +124,8 @@ jobs:
           command: |
             cd terraform_infra
             make init project=rails_application
-            make new project=rails_application workspace=<< pipeline.parameters.workspace >>
+            make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
+            make plan project=rails_application workspace=<< pipeline.parameters.workspace >>
 
 workflows:
   version: 2
