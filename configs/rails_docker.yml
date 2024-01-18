@@ -144,6 +144,8 @@ workflows:
               - Github
               - AWS_ECR
         - deploy:
+            requires:
+              - build
             context:
               - GithubDev
               - Github
