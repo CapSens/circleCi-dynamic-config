@@ -30,6 +30,9 @@ parameters:
   tfvars:
     type: string
     default: ""
+  workspace:
+    type: string
+    default: ""
 
 jobs:
   build:
@@ -121,6 +124,7 @@ jobs:
           command: |
             cd terraform_infra
             make init project=rails_application
+            make new project=rails_application workspace=<< pipeline.parameters.workspace >>
 
 workflows:
   version: 2
