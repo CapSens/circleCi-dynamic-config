@@ -102,9 +102,21 @@ jobs:
             git clone git@github.com:CapSens/terraform-infra.git terraform_infra
 
       - run:
-          name: Show tvars
+          name: Show parameters
           command: |
-            echo "Terraform variables: << pipeline.parameters.tfvars >>"
+            echo "Build and deploy: << pipeline.parameters.build-and-deploy >>"
+            echo "Deploy: << pipeline.parameters.deploy >>"
+            echo "Tfvars: << pipeline.parameters.tfvars >>"
+
+      - run:
+          name: Decrypt tfvars
+          command: |
+            decrypted_tfvars=$(
+              echo "<< pipeline.parameters.tfvars >>" |
+              openssl enc -base64 -d -aes-256-cbc -salt -pass pass:${TERRAFORM_ENCRYPTION_KEY} -pbkdf2
+            )
+
+            echo "decrypted_tfvars: $decrypted_tfvars"
 
       # - run:
       #     name: Terraform init
@@ -124,7 +136,6 @@ workflows:
     jobs:
         - build:
             context:
-              # Onlly for testing purpose
               - GithubDev
               - Github
               - AWS_ECR
@@ -134,13 +145,11 @@ workflows:
     jobs:
         - build:
             context:
-              # Onlly for testing purpose
               - GithubDev
               - Github
               - AWS_ECR
         - deploy:
             context:
-              # Onlly for testing purpose
               - GithubDev
               - Github
               - AWS_ECR
@@ -150,7 +159,6 @@ workflows:
     jobs:
         - deploy:
             context:
-              # Onlly for testing purpose
               - GithubDev
               - Github
               - AWS_ECR
