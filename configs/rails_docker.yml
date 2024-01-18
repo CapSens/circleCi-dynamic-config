@@ -113,11 +113,11 @@ jobs:
             touch $tfvars_file
             echo "${decrypted_tfvars}" > $tfvars_file
 
-      # - run:
-      #     name: Terraform init
-      #     command: |
-      #       cd terraform_infra
-      #       make init project=rails_application
+      - run:
+          name: Terraform init
+          command: |
+            cd terraform_infra
+            make init project=rails_application
 
 workflows:
   version: 2
