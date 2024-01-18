@@ -115,7 +115,7 @@ jobs:
             )
             cd terraform_infra
             mkdir -p live/rails_application
-            tfvars_file="live/rails_application/<< pipeline.parameters.project-name >>.tfvars"
+            tfvars_file="live/rails_application/tfvars/<< pipeline.parameters.workspace >>.tfvars"
             touch $tfvars_file
             echo "${decrypted_tfvars}" > $tfvars_file
 
