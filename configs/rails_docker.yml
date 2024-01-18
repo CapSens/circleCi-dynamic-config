@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   terraform: circleci/terraform@3.1.0
+  kubernetes: circleci/kubernetes@1.3.1
 
 parameters:
   project-name:
@@ -91,10 +92,8 @@ jobs:
       - image: cimg/aws:2023.09
     steps:
       - checkout
-      - run:
-          name: Deploy docker image
-          command: |
-            echo "Deploy docker image"
+      - terraform/install
+      - kubernetes/install-kubectl
 
       - run:
           name: Clone Terraform repository
@@ -102,21 +101,17 @@ jobs:
             git clone git@github.com:CapSens/terraform-infra.git terraform_infra
 
       - run:
-          name: Show parameters
-          command: |
-            echo "Build and deploy: << pipeline.parameters.build-and-deploy >>"
-            echo "Deploy: << pipeline.parameters.deploy >>"
-            echo "Tfvars: << pipeline.parameters.tfvars >>"
-
-      - run:
-          name: Decrypt tfvars
+          name: Create tfvars file
           command: |
             decrypted_tfvars=$(
               echo "<< pipeline.parameters.tfvars >>" |
               openssl enc -base64 -d -aes-256-cbc -salt -pass pass:${TERRAFORM_ENCRYPTION_KEY} -pbkdf2
             )
-
-            echo "decrypted_tfvars: $decrypted_tfvars"
+            cd terraform_infra
+            mkdir -p live/rails_application
+            tfvars_file="live/rails_application/<< pipeline.parameters.project-name >>.tfvars"
+            touch $tfvars_file
+            echo "${decrypted_tfvars}" > $tfvars_file
 
       # - run:
       #     name: Terraform init
