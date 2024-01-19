@@ -75,7 +75,10 @@ jobs:
               staging)
                 bucket=<< pipeline.parameters.assets-bucket-staging >>
                 ;;
-              *)
+              improve-container) # Fix for CI building, TODO: Remove when CI is fixed
+                bucket=<< pipeline.parameters.assets-bucket-staging >>
+                ;;
+              *) # TODO: Should break the build if no branch matches
                 bucket="empty"
                 ;;
             esac && \
