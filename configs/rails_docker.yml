@@ -80,6 +80,8 @@ jobs:
                 ;;
               *) # TODO: Should break the build if no branch matches
                 bucket="empty"
+                echo "Unmanaged branch ${CIRCLE_BRANCH}"
+                exit 1
                 ;;
             esac && \
             aws s3 cp ./public-assets s3://${bucket}/assets/ --recursive && \
