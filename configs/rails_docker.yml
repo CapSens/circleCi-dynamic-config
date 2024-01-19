@@ -90,7 +90,7 @@ jobs:
           name: Save Docker image layer cache
           command: |
             mkdir -p /tmp/caches
-            docker `  ` -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
       - save_cache:
           key: v1-{{ .Branch }}-{{ epoch }}
           paths:
