@@ -11,6 +11,9 @@ parameters:
   ruby-version:
     type: string
     default: "3.2.2"
+  ruby-docker-distro:
+    type: string
+    default: "bullseye"
   bundler-version:
     type: string
     default: "2.4.10"
@@ -64,6 +67,7 @@ jobs:
           name: Build application Docker image
           command: |
             docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
+              --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
               --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
               --build-arg RAILS_VERSION=<< pipeline.parameters.rails-version >> \
               --build-arg NODE_MAJOR=16 \
