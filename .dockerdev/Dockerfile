@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
 ARG RUBY_VERSION
-ARG DISTRO_NAME=-slim-bullseye
+ARG DISTRO_NAME=bullseye
 
-FROM ruby:$RUBY_VERSION$DISTRO_NAME as base
+FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME as base
 RUN echo "IRB.conf[:HISTORY_FILE] = ENV['IRB_HISTFILE']" >> ~/.irbrc
 
 ARG DISTRO_NAME
@@ -181,7 +181,7 @@ RUN for required_variable in $REQUIRED_VARIABLES; do \
 
 # Finally, our production image definition
 # NOTE: It's not extending the base image, it's a new one
-FROM ruby:$RUBY_VERSION$DISTRO_NAME AS production
+FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME AS production
 
 # Production-only dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
