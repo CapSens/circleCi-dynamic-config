@@ -208,8 +208,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   $(grep -Ev '^\s*#' /tmp/Aptfile.dev | xargs)
 
 # Upgrade RubyGems and install the latest Bundler version
-RUN gem update --system && \
-  gem install bundler
+# RUN gem update --system && \
+RUN gem install bundler
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
 RUN groupadd --gid 1005 my_user \
