@@ -181,7 +181,7 @@ RUN for required_variable in $REQUIRED_VARIABLES; do \
 
 # Finally, our production image definition
 # NOTE: It's not extending the base image, it's a new one
-FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME AS production
+FROM ruby:$RUBY_VERSION$DISTRO_NAME AS production
 
 # Production-only dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
