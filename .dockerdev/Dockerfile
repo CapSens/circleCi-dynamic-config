@@ -2,6 +2,7 @@
 
 ARG RUBY_VERSION
 ARG DISTRO_NAME=bullseye
+ARG BUNDLER_VERSION
 
 FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME as base
 RUN echo "IRB.conf[:HISTORY_FILE] = ENV['IRB_HISTFILE']" >> ~/.irbrc
@@ -74,8 +75,8 @@ ENV BUNDLE_APP_CONFIG=.bundle
 # ENV PATH /app/bin:$PATH
 
 # Upgrade RubyGems and install the latest Bundler version
-RUN gem update --system && \
-  gem install bundler
+# RUN gem update --system && \
+RUN echo $BUNDLER_VERSION && gem install bundler -v $BUNDLER_VERSION
 
 # Create a directory for the app code
 RUN mkdir -p /app
@@ -209,7 +210,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # Upgrade RubyGems and install the latest Bundler version
 # RUN gem update --system && \
-RUN gem install bundler
+RUN echo $BUNDLER_VERSION && gem install bundler -v $BUNDLER_VERSION
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
 RUN groupadd --gid 1005 my_user \
