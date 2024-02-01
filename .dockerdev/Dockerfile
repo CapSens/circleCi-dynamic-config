@@ -152,8 +152,8 @@ RUN mkdir $BUNDLE_PATH \
   && rm -rf /home/my_user/.bundle/cache/*
 
 # Install JS packages
-COPY --chown=my_user:my_user package.json yarn.lock ./
-RUN yarn install --check-files
+# COPY --chown=my_user:my_user package.json yarn.lock ./
+# RUN yarn install --check-files
 
 # Copy code
 COPY --chown=my_user:my_user . .
