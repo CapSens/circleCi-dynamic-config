@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 
 ARG RUBY_VERSION
-ARG DISTRO_NAME=bullseye
+ARG DISTRO_NAME=-slim-bullseye
 
-FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME as base
+FROM ruby:$RUBY_VERSION$DISTRO_NAME as base
 RUN echo "IRB.conf[:HISTORY_FILE] = ENV['IRB_HISTFILE']" >> ~/.irbrc
 
 ARG DISTRO_NAME
@@ -151,12 +151,11 @@ RUN mkdir $BUNDLE_PATH \
   && rm -rf $BUNDLE_PATH/ruby/3.1.0/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
 
-# Install JS packages
-# COPY --chown=my_user:my_user package.json yarn.lock ./
-# RUN yarn install --check-files
-
 # Copy code
 COPY --chown=my_user:my_user . .
+
+# Install JS packages
+RUN yarn install --check-files
 
 # Precompile assets
 # NOTE: The command may require adding some environment variables (e.g., SECRET_KEY_BASE) if you're not using
