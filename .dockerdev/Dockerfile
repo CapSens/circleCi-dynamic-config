@@ -2,7 +2,6 @@
 
 ARG RUBY_VERSION
 ARG DISTRO_NAME=bullseye
-ARG BUNDLER_VERSION
 
 FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME as base
 RUN echo "IRB.conf[:HISTORY_FILE] = ENV['IRB_HISTFILE']" >> ~/.irbrc
@@ -24,7 +23,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   less \
   git \
   libjemalloc2 \
-  xz-utils
+  xz-utils \
+  shared-mime-info
 
 # Install postgres
 ARG PG_MAJOR
@@ -74,9 +74,10 @@ ENV BUNDLE_APP_CONFIG=.bundle
 # Uncomment this line if you want to run binstubs without prefixing with `bin/` or `bundle exec`
 # ENV PATH /app/bin:$PATH
 
+ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
-# RUN gem update --system && \
-RUN echo $BUNDLER_VERSION && gem install bundler -v $BUNDLER_VERSION
+RUN (test -n $BUNDLER_VERSION && gem install bundler -v $BUNDLER_VERSION) \
+  || (gem update --system && gem install bundler)
 
 # Create a directory for the app code
 RUN mkdir -p /app
@@ -149,7 +150,7 @@ RUN mkdir $BUNDLE_PATH \
   && bundle config --local clean 'true' \
   && bundle config --local no-cache 'true' \
   && bundle install --jobs=${BUNDLE_JOBS} \
-  && rm -rf $BUNDLE_PATH/ruby/3.1.0/cache/* \
+  && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
 
 # Copy code
@@ -169,7 +170,9 @@ ENV SECRET_KEY_BASE=foo \
   S3_BUCKET=foo \
   S3_SECRET=foo
 
+ARG DB_ADAPTER=postgresql
 ENV DB_NAME=fake_database_name
+ENV DB_ADAPTER=$DB_ADAPTER
 # Copy database config to avoid human errors
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 
@@ -178,7 +181,7 @@ RUN echo "REQUIRED_VARIABLES: $REQUIRED_VARIABLES"
 RUN for required_variable in $REQUIRED_VARIABLES; do \
     export "$required_variable=foo" ; \
     done; \
-    bundle exec rails assets:precompile
+    bundle exec rake assets:precompile
 
 # Finally, our production image definition
 # NOTE: It's not extending the base image, it's a new one
@@ -198,7 +201,20 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   locales \
   libpq5 \
   libjemalloc2 \
+  shared-mime-info \
   && update-locale LANG=C.UTF-8 LC_ALL=C.UTF-8
+
+# Install NodeJS and NPM from Nodesource
+ARG NODE_MAJOR=16
+ARG FORCE_NODE=""
+RUN test -n $FORCE_NODE \
+  && apt-get install -y ca-certificates curl gnupg --no-install-recommends \
+  && mkdir -p /etc/apt/keyrings \
+  && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+  && apt-get update \
+  && apt-get install nodejs -y --no-install-recommends \
+  || echo "nodejs not mandatory for production environment"
 
 COPY .dockerdev/Aptfile /tmp/Aptfile
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -208,9 +224,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
   $(grep -Ev '^\s*#' /tmp/Aptfile.dev | xargs)
 
+ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
-# RUN gem update --system && \
-RUN echo $BUNDLER_VERSION && gem install bundler -v $BUNDLER_VERSION
+RUN (test -n $BUNDLER_VERSION && gem install bundler -v $BUNDLER_VERSION) \
+  || (gem update --system && gem install bundler)
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
 RUN groupadd --gid 1005 my_user \

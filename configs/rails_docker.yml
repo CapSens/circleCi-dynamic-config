@@ -15,13 +15,18 @@ parameters:
     type: string
     default: "bullseye"
   bundler-version:
+    description: "leave empty to use latest version"
     type: string
-    default: "2.4.10"
-  # TODO: check if this parameter can be removed
-  rails-version:
+    default: ""
+  db_adapter_for_build:
+    description: "Use nulldb (activerecord-nulldb-adapter gem) for apps that needs to connect to database on initialization"
     type: string
-    default: "7.0.0"
+    default: "postgresql"
   required-variables:
+    type: string
+    default: ""
+  force_node:
+    description: "any not empty value will force node to be installed in final docker image"
     type: string
     default: ""
   build-and-deploy:
@@ -70,7 +75,8 @@ jobs:
               --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
               --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
               --build-arg BUNDLER_VERSION=<< pipeline.parameters.bundler-version >> \
-              --build-arg RAILS_VERSION=<< pipeline.parameters.rails-version >> \
+              --build-arg DB_ADAPTER=<< pipeline.parameters.db_adapter_for_build >> \
+              --build-arg FORCE_NODE=<< pipeline.parameters.force_node >> \
               --build-arg NODE_MAJOR=16 \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
               --build-arg GITHUB_TOKEN_DEV=${GITHUB_TOKEN_DEV} \
