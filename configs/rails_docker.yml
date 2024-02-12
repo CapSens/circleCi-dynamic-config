@@ -136,7 +136,8 @@ jobs:
             cd terraform_infra
             make init project=rails_application
             make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
-            make plan project=rails_application workspace=<< pipeline.parameters.workspace >>
+            make apply project=rails_application workspace=<< pipeline.parameters.workspace >> plan_args=-auto-approve
+
 
 workflows:
   version: 2

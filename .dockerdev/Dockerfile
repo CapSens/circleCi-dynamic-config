@@ -76,7 +76,7 @@ ENV BUNDLE_APP_CONFIG=.bundle
 
 ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
-RUN (test -n "$BUNDLER_VERSION" && gem install bundler -v $BUNDLER_VERSION) \
+RUN (test -n "$BUNDLER_VERSION" && gem install bundler:$BUNDLER_VERSION) \
   || (gem update --system && gem install bundler)
 
 # Create a directory for the app code
@@ -226,7 +226,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
-RUN (test -n "$BUNDLER_VERSION" && gem install bundler -v $BUNDLER_VERSION) \
+RUN (test -n "$BUNDLER_VERSION" && gem install bundler:$BUNDLER_VERSION) \
   || (gem update --system && gem install bundler)
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
