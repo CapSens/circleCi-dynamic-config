@@ -144,7 +144,7 @@ RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
 RUN mkdir $BUNDLE_PATH \
   && bundle config --local deployment 'true' \
   && bundle config --local path "${BUNDLE_PATH}" \
-  # && bundle config --local without 'development test' \
+  && bundle config --local with "${RAILS_ENV}" \
   && bundle config --local clean 'true' \
   && bundle config --local no-cache 'true' \
   && bundle install --jobs=${BUNDLE_JOBS} \

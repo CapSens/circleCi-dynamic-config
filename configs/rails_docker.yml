@@ -23,6 +23,7 @@ parameters:
     type: string
     default: "postgresql"
   required-variables:
+    description: "space separated list of required ENV variables to run rails application"
     type: string
     default: ""
   force_node:
