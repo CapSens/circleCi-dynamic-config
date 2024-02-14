@@ -91,14 +91,14 @@ jobs:
 
             for i in "${!branches[@]}"; do
               if [ $CIRCLE_BRANCH == ${branches[$i]%%:*} ]; then
-                echo 'export RAILS_ENV=${branches[$i]##*:}' >> "$BASH_ENV"
+                echo "export RAILS_ENV=${branches[$i]##*:}" >> "$BASH_ENV"
                 source "$BASH_ENV"
-                echo 'RAILS_ENV defined as ${RAILS_ENV}'
+                echo "RAILS_ENV defined as ${RAILS_ENV}"
                 exit 0
               fi
             done
 
-            echo 'no env found for branch ${CIRCLE_BRANCH}. Exiting...'
+            echo "no env found for branch ${CIRCLE_BRANCH}. Exiting..."
             exit 1
 
       - run:
