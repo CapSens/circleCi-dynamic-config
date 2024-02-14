@@ -29,12 +29,13 @@ parameters:
     description: "any not empty value will force node to be installed in final docker image"
     type: string
     default: ""
-  branches-for-assets:
+  branches-for-envs:
+    description: "List of branches matching environments for docker build and assets compilation"
     type: string
     default: "('master:production' 'staging')" # add any branch you want assets to be compiled on
   assets-buckets:
     type: string
-    default: "()" # must match branches-for-assets size and order, if not filled, it will be (assets-bucket-production assets-bucket-staging)
+    default: "()" # must match branches-for-envs size and order, if not filled, it will be (assets-bucket-production assets-bucket-staging)
   assets-bucket-staging:
     type: string
     default: ""
@@ -84,6 +85,23 @@ jobs:
             cp -R dynamic_configs/.dockerdev ./
             rm -rf dynamic_configs
       - run:
+          name: Determine rails environment to build
+          command: |
+            branches=<< pipeline.parameters.branches-for-envs >>
+
+            for i in "${!branches[@]}"; do
+              if [ $CIRCLE_BRANCH == ${branches[$i]%%:*} ]; then
+                echo 'export RAILS_ENV=${branches[$i]##*:}' >> "$BASH_ENV"
+                source "$BASH_ENV"
+                echo 'RAILS_ENV defined as ${RAILS_ENV}'
+                exit 0
+              fi
+            done
+
+            echo 'no env found for branch ${CIRCLE_BRANCH}. Exiting...'
+            exit 1
+
+      - run:
           name: Build application Docker image
           command: |
             docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
@@ -101,7 +119,7 @@ jobs:
       - run:
           name: Extract assets from container and push to s3
           command: |
-            branches=<< pipeline.parameters.branches-for-assets >>
+            branches=<< pipeline.parameters.branches-for-envs >>
             assetsBuckets=<< pipeline.parameters.assets-buckets >>
             if [ ${#assetsBuckets[@]} -eq 0 ]; then
               assetsBuckets=('<< pipeline.parameters.assets-bucket-production >>' '<< pipeline.parameters.assets-bucket-staging >>')
@@ -184,13 +202,21 @@ jobs:
             echo "${decrypted_tfvars}" > $tfvars_file
 
       - run:
+         name: Kubeconfig initialization
+         command: |
+           cd terraform_infra
+           AWS_REGION=eu-west-1
+           TERRAFORM_WORKSPACE=<< pipeline.parameters.workspace >>
+           CLUSTER_ARN=arn:aws:eks:eu-west-1:396522184519:cluster/<< pipeline.parameters.workspace >>
+           aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_ARN} && kubectl config rename-context ${CLUSTER_ARN} capsens-${TERRAFORM_WORKSPACE}
+
+      - run:
           name: Terraform deploy
           command: |
             cd terraform_infra
             make init project=rails_application
             make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
-            make apply project=rails_application workspace=<< pipeline.parameters.workspace >> plan_args=-auto-approve
-
+            make apply project=rails_application workspace=<< pipeline.parameters.workspace >> extra_args=-auto-approve
 
 workflows:
   version: 2

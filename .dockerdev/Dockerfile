@@ -97,7 +97,6 @@ FROM base AS development
 ENV RAILS_ENV=development \
   LD_PRELOAD=libjemalloc.so.2
 
-
 # The major difference from the base image is that we may have development-only system
 # dependencies (like Vim or graphviz).
 # We extract them into the Aptfile.dev file.
@@ -123,19 +122,18 @@ USER my_user
 RUN mkdir /home/my_user/app
 WORKDIR /home/my_user/app
 
-# Only for testing purposes
-ARG GITHUB_TOKEN_DEV
+ARG RAILS_ENV
+ARG GITHUB_TOKEN
 
-# ARG GITHUB_TOKEN
 # Then, we re-configure Bundler
-ENV RAILS_ENV=staging \
+ENV RAILS_ENV=$RAILS_ENV \
   LANG=C.UTF-8 \
   BUNDLE_JOBS=4 \
   BUNDLE_RETRY=3 \
   BUNDLE_APP_CONFIG=/home/my_user/bundle \
   BUNDLE_PATH=/home/my_user/bundle \
   GEM_HOME=/home/my_user/bundle \
-  BUNDLE_GITHUB__COM=x-access-token:"$GITHUB_TOKEN_DEV" \
+  BUNDLE_GITHUB__COM=x-access-token:"$GITHUB_TOKEN" \
   LD_PRELOAD=libjemalloc.so.2
 
 # Install Ruby gems
@@ -236,8 +234,9 @@ RUN mkdir /home/my_user/app
 WORKDIR /home/my_user/app
 USER my_user
 
+ARG RAILS_ENV
 # Ruby/Rails env configuration
-ENV RAILS_ENV=staging \
+ENV RAILS_ENV=$RAILS_ENV \
   BUNDLE_APP_CONFIG=/home/my_user/bundle \
   BUNDLE_PATH=/home/my_user/bundle \
   GEM_HOME=/home/my_user/bundle \
