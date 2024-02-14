@@ -29,6 +29,21 @@ parameters:
     description: "any not empty value will force node to be installed in final docker image"
     type: string
     default: ""
+  branches-for-assets:
+    type: string
+    default: "('master:production' 'staging')" # add any branch you want assets to be compiled on
+  assets-buckets:
+    type: string
+    default: "()" # must match branches-for-assets size and order, if not filled, it will be (assets-bucket-production assets-bucket-staging)
+  assets-bucket-staging:
+    type: string
+    default: ""
+  assets-bucket-production:
+    type: string
+    default: ""
+  ignored_cves:
+    type: string
+    default: ""
   build-and-deploy:
     type: boolean
     default: false
@@ -84,6 +99,43 @@ jobs:
               --file .dockerdev/Dockerfile \
               .
       - run:
+          name: Extract assets from container and push to s3
+          command: |
+            branches=<< pipeline.parameters.branches-for-assets >>
+            assetsBuckets=<< pipeline.parameters.assets-buckets >>
+            if [ ${#assetsBuckets[@]} -eq 0 ]; then
+              assetsBuckets=('<< pipeline.parameters.assets-bucket-production >>' '<< pipeline.parameters.assets-bucket-staging >>')
+            fi
+
+            for i in "${!branches[@]}"; do
+              if [ $CIRCLE_BRANCH == ${branches[$i]%%:*} ]; then
+                current_env=${branches[$i]##*:}
+                bucket=${assetsBuckets[$i]}
+              fi
+            done
+
+            if [[ -z "${bucket}" ]]; then
+              echo "S3 bucket variable has not been set for env ${current_env}. Skipping assets compilation."
+              exit 0
+            else
+              echo "ready to copy assets for env ${current_env} on assets bucket ${bucket}"
+
+              id=$(docker create ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1})
+
+              docker cp $id:/home/my_user/app/public/assets public-assets && rm public-assets/manifest.json && \
+              aws s3 cp ./public-assets s3://${bucket}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+
+              if [[ `docker cp $id:/home/my_user/app/public/assets public-packs` ]]; then
+                aws s3 cp ./public-packs s3://${bucket}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+                aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive
+              else
+                echo "No public/packs directory, skipping packs upload."
+              fi
+
+              docker rm -v $id
+            fi
+
+      - run:
           name: Save Docker image layer cache
           command: |
             mkdir -p /tmp/caches
@@ -92,7 +144,7 @@ jobs:
           key: v1-{{ .Branch }}-{{ epoch }}
           paths:
             - /tmp/caches/app.tar
-      - deploy:
+      - run:
           name: Push application Docker image
           command: |
             # if [ "${CIRCLE_BRANCH}" == "master" ]; then
@@ -100,6 +152,7 @@ jobs:
               aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
               docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
             # fi
+
   deploy:
     working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
