@@ -112,7 +112,6 @@ jobs:
               --build-arg FORCE_NODE=<< pipeline.parameters.force_node >> \
               --build-arg NODE_MAJOR=16 \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
-              --build-arg GITHUB_TOKEN_DEV=${GITHUB_TOKEN_DEV} \
               --build-arg REQUIRED_VARIABLES="<< pipeline.parameters.required-variables >>" \
               --file .dockerdev/Dockerfile \
               .
@@ -231,7 +230,6 @@ workflows:
         - build:
             context:
               - GithubDev
-              - Github
               - AWS_ECR
 
   build-and-deploy:
@@ -240,14 +238,12 @@ workflows:
         - build:
             context:
               - GithubDev
-              - Github
               - AWS_ECR
         - deploy:
             requires:
               - build
             context:
               - GithubDev
-              - Github
               - AWS_ECR
 
   deploy:
@@ -256,5 +252,4 @@ workflows:
         - deploy:
             context:
               - GithubDev
-              - Github
               - AWS_ECR
