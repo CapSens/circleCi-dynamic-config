@@ -107,6 +107,7 @@ jobs:
           command: |
             docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
               --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
+              --build-arg RAILS_ENV=${RAILS_ENV} \
               --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
               --build-arg BUNDLER_VERSION=<< pipeline.parameters.bundler-version >> \
               --build-arg DB_ADAPTER=<< pipeline.parameters.db_adapter_for_build >> \
@@ -202,13 +203,21 @@ jobs:
             echo "${decrypted_tfvars}" > $tfvars_file
 
       - run:
-         name: Kubeconfig initialization
-         command: |
-           cd terraform_infra
-           AWS_REGION=eu-west-1
-           TERRAFORM_WORKSPACE=<< pipeline.parameters.workspace >>
-           CLUSTER_ARN=arn:aws:eks:eu-west-1:396522184519:cluster/<< pipeline.parameters.workspace >>
-           aws eks --region ${AWS_REGION} update-kubeconfig --name ${CLUSTER_ARN} && kubectl config rename-context ${CLUSTER_ARN} capsens-${TERRAFORM_WORKSPACE}
+          name: Assume admin role for k8s cluster
+          command: |
+            cd terraform_infra
+            aws --profile default configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+            aws --profile default configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+            aws --profile default configure set default.region eu-west-1
+            make kube_add workspace=<< pipeline.parameters.workspace >> aws_profile=default aws_iam_role=admin
+
+      - run:
+          name: Kubeconfig initialization
+          command: |
+            cd terraform_infra
+            CLUSTER_ARN=arn:aws:eks:eu-west-1:396522184519:cluster/<< pipeline.parameters.workspace >>
+            aws eks --profile default update-kubeconfig --name ${CLUSTER_ARN} \
+              && kubectl config rename-context ${CLUSTER_ARN} capsens-<< pipeline.parameters.workspace >>
 
       - run:
           name: Terraform deploy
