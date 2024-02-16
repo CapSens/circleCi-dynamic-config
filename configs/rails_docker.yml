@@ -55,6 +55,9 @@ parameters:
   tfvars:
     type: string
     default: ""
+  k8s-cluster:
+    type: string
+    default: ""
   workspace:
     type: string
     default: ""
@@ -209,15 +212,14 @@ jobs:
             aws --profile default configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
             aws --profile default configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
             aws --profile default configure set default.region eu-west-1
-            make kube_add workspace=<< pipeline.parameters.workspace >> aws_profile=default aws_iam_role=admin
+            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=default aws_iam_role=admin
 
       - run:
           name: Kubeconfig initialization
           command: |
             cd terraform_infra
             CLUSTER_ARN=arn:aws:eks:eu-west-1:396522184519:cluster/<< pipeline.parameters.workspace >>
-            aws eks --profile default update-kubeconfig --name ${CLUSTER_ARN} \
-              && kubectl config rename-context ${CLUSTER_ARN} capsens-<< pipeline.parameters.workspace >>
+            kubectl config rename-context ${CLUSTER_ARN} capsens-<< pipeline.parameters.workspace >>
 
       - run:
           name: Terraform deploy
