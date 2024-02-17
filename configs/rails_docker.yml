@@ -208,18 +208,21 @@ jobs:
       - run:
           name: Assume admin role for k8s cluster
           command: |
-            cd terraform_infra
             aws --profile default configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
             aws --profile default configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
             aws --profile default configure set default.region eu-west-1
-            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=default aws_iam_role=admin
+
+            cat \<<- EOF >> ~/.aws/config
+            [profile deployer]
+            role_arn = arn:aws:iam::396522184519:role/eks_admin_<< pipeline.parameters.k8s-cluster >>
+            source_profile = default
+            EOF
 
       - run:
           name: Kubeconfig initialization
           command: |
             cd terraform_infra
-            CLUSTER_ARN=arn:aws:eks:eu-west-1:396522184519:cluster/<< pipeline.parameters.workspace >>
-            kubectl config rename-context ${CLUSTER_ARN} capsens-<< pipeline.parameters.workspace >>
+            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=admin
 
       - run:
           name: Terraform deploy
