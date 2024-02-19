@@ -49,24 +49,11 @@ RUN apt-get install -y ca-certificates curl gnupg --no-install-recommends \
   && apt-get install nodejs -y --no-install-recommends \
   && npm install -g yarn
 
-# Install Imagemagick
-ARG IMAGEMAGICK_VERSION="7.1.0-5"
-RUN curl -o /tmp/im.tar.xz https://imagemagick.org/archive/releases/ImageMagick-${IMAGEMAGICK_VERSION}.tar.xz \
-  && curl -o /tmp/im.sig https://imagemagick.org/archive/releases/ImageMagick-${IMAGEMAGICK_VERSION}.tar.xz.asc \
-  && gpg --batch --keyserver keyserver.ubuntu.com --recv 89AB63D48277377A \
-  && gpg --batch --verify /tmp/im.sig /tmp/im.tar.xz \
-  && tar xJf /tmp/im.tar.xz -C /tmp \
-  && cd /tmp/ImageMagick-${IMAGEMAGICK_VERSION} \
-  && ./configure --with-rsvg && make -j 9 && make install \
-  && ldconfig /usr/local/lib \
-  && rm -rf /tmp/*
-
 # Configure bundler
 ENV LANG=C.UTF-8 \
   BUNDLE_JOBS=4 \
   BUNDLE_RETRY=3 \
   LD_PRELOAD=libjemalloc.so.2
-
 
 # Store Bundler settings in the project's root
 ENV BUNDLE_APP_CONFIG=.bundle
@@ -220,7 +207,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=tmpfs,target=/var/log \
   apt-get update -qq && \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
-  $(grep -Ev '^\s*#' /tmp/Aptfile.dev | xargs)
+  $(grep -Ev '^\s*#' /tmp/Aptfile | xargs)
 
 ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
@@ -261,5 +248,8 @@ COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
 COPY --from=production-builder /home/my_user/app/public/assets /home/my_user/app/public/assets
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
 COPY --chown=my_user:my_user --from=production-builder /home/my_user/app/tmp/cache/bootsnap* /home/my_user/app/tmp/cache/
+
+# Force creation of tmp and log folders if not exists
+RUN mkdir -p /home/my_user/app/tmp /home/my_user/app/log
 
 CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
