@@ -18,7 +18,7 @@ parameters:
     description: "leave empty to use latest version"
     type: string
     default: ""
-  db_adapter_for_build:
+  db-adapter-for-build:
     description: "Use nulldb (activerecord-nulldb-adapter gem) for apps that needs to connect to database on initialization"
     type: string
     default: "postgresql"
@@ -26,7 +26,7 @@ parameters:
     description: "space separated list of required ENV variables to run rails application"
     type: string
     default: ""
-  force_node:
+  force-node:
     description: "any not empty value will force node to be installed in final docker image"
     type: string
     default: ""
@@ -113,8 +113,8 @@ jobs:
               --build-arg RAILS_ENV=${RAILS_ENV} \
               --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
               --build-arg BUNDLER_VERSION=<< pipeline.parameters.bundler-version >> \
-              --build-arg DB_ADAPTER=<< pipeline.parameters.db_adapter_for_build >> \
-              --build-arg FORCE_NODE=<< pipeline.parameters.force_node >> \
+              --build-arg DB_ADAPTER=<< pipeline.parameters.db-adapter-for-build >> \
+              --build-arg FORCE_NODE=<< pipeline.parameters.force-node >> \
               --build-arg NODE_MAJOR=16 \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
               --build-arg REQUIRED_VARIABLES="<< pipeline.parameters.required-variables >>" \
