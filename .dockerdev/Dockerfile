@@ -75,26 +75,6 @@ EXPOSE 3000
 # Use Bash as the default command
 CMD ["/usr/bin/bash"]
 
-###################
-### Development ###
-###################
-# Then, we define the "development" stage from the base one
-FROM base AS development
-
-ENV RAILS_ENV=development \
-  LD_PRELOAD=libjemalloc.so.2
-
-# The major difference from the base image is that we may have development-only system
-# dependencies (like Vim or graphviz).
-# We extract them into the Aptfile.dev file.
-COPY .dockerdev/Aptfile.dev /tmp/Aptfile.dev
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  --mount=type=tmpfs,target=/var/log \
-  apt-get update -qq && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
-  $(grep -Ev '^\s*#' /tmp/Aptfile.dev | xargs)
-
 ##################
 ### Production ###
 ##################
@@ -234,6 +214,9 @@ ENV RAILS_ENV=$RAILS_ENV \
 
 
 EXPOSE 3000
+
+# Copy .gitignore file to lightweight layer
+COPY --chown=my_user:my_user .dockerdev/.gitignore /home/my_user/app/.
 
 # Copy code
 COPY --chown=my_user:my_user . .
