@@ -212,11 +212,7 @@ ENV RAILS_ENV=$RAILS_ENV \
   LC_ALL=C.UTF-8 \
   LD_PRELOAD=libjemalloc.so.2
 
-
 EXPOSE 3000
-
-# Copy .gitignore file to lightweight layer
-COPY --chown=my_user:my_user .dockerdev/.gitignore /home/my_user/app/.
 
 # Copy code
 COPY --chown=my_user:my_user . .
