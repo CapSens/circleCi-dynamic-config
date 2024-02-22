@@ -188,17 +188,8 @@ jobs:
       - image: cimg/aws:2023.09
     steps:
       - checkout
-      - setup_remote_docker
-      - restore_cache:
-          keys:
-            - v1-{{ .Branch }}
-          paths:
-            - /tmp/caches/app.tar
-      - run:
-          name: Load Docker image layer cache
-          command: |
-            set +o pipefail
-            docker load -i /tmp/caches/app.tar | true
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
           name: Download shared Dockerfile and utils
           command: |
@@ -272,16 +263,6 @@ jobs:
 
               docker rm -v $id
             fi
-
-      - run:
-          name: Save Docker image layer cache
-          command: |
-            mkdir -p /tmp/caches
-            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
-      - save_cache:
-          key: v1-{{ .Branch }}-{{ epoch }}
-          paths:
-            - /tmp/caches/app.tar
       - run:
           name: Push application Docker image
           command: |
