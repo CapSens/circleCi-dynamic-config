@@ -189,6 +189,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
   $(grep -Ev '^\s*#' /tmp/Aptfile | xargs)
 
+# add policy to allow convert images to PDF with imagemagick if it's installed
+RUN if command -v convert &> /dev/null; \
+  then \
+    policy_path='/etc/ImageMagick-*/policy.xml'; \
+    old_line_regex='rights="none" pattern="PDF"'; \
+    new_policy='rights="read|write" pattern="PDF"'; \
+    sed -i "s/$old_line_regex/$new_policy/" $policy_path; \
+  else \
+    echo "imagemagick not mandatory for production environment"; \
+  fi
+
 ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
 RUN (test -n "$BUNDLER_VERSION" && gem install bundler:$BUNDLER_VERSION) \
