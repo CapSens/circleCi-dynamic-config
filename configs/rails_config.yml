@@ -175,8 +175,9 @@ jobs:
             fi
 
             yarn
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
+            echo 'Rails.application.config.require_master_key = ENV["SKIP_MASTER_KEY"].blank?' >> config/environments/${ASSETS_ENV}; \
+            RAILS_ENV=${ASSETS_ENV} SKIP_MASTER_KEY=true bundle exec rake db:create db:migrate
+            RAILS_ENV=${ASSETS_ENV} SKIP_MASTER_KEY=true bundle exec rake assets:clobber assets:precompile
             aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
 
             if [ -d "public/packs" ]; then
