@@ -1,0 +1,114 @@
+version: 2.1
+
+parameters:
+  project-name:
+    type: string
+    default: "my-project"
+  ruby-version:
+    type: string
+    default: "3.2.2"
+  bundler-version:
+    type: string
+    default: "2.4.10"
+  # TODO: check if this parameter can be removed
+  rails-version:
+    type: string
+    default: "7.0.0"
+  assets-bucket-staging:
+    type: string
+    default: ""
+  assets-bucket-production:
+    type: string
+    default: ""
+
+jobs:
+  build:
+    working_directory: /tmp/app
+    environment:
+      DOCKER_REGISTRY: 396522184519.dkr.ecr.eu-west-1.amazonaws.com
+    docker:
+      - image: cimg/aws:2023.09
+    steps:
+      - checkout
+      - setup_remote_docker
+      - restore_cache:
+          keys:
+            - v1-{{ .Branch }}
+          paths:
+            - /tmp/caches/app.tar
+      - run:
+          name: Load Docker image layer cache
+          command: |
+            set +o pipefail
+            docker load -i /tmp/caches/app.tar | true
+      - run:
+          name: Download shared Dockerfile and utils
+          command: |
+            git clone --depth 1 --branch improve-container git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
+            cp -R dynamic_configs/.dockerdev ./
+            rm -rf dynamic_configs
+      - run:
+          name: Debug variables
+          command: |
+            echo "Docker Image name (manual): ${DOCKER_REGISTRY}/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}"
+            echo "Github name: ${GITHUB_TOKEN}"
+      - run:
+          name: Build application Docker image
+          command: |
+            docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
+              --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
+              --build-arg RAILS_VERSION=<< pipeline.parameters.rails-version >> \
+              --build-arg NODE_MAJOR=16 \
+              --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+              --file .dockerdev/Dockerfile \
+              .
+      - run:
+          name: Extract assets from container and push to s3
+          command: |
+            id=$(docker create ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}) && \
+            docker cp $id:/home/my_user/app/public/assets public-assets && \
+            rm public-assets/manifest.json && \
+            case "${CIRCLE_BRANCH}" in
+              master)
+                bucket=<< pipeline.parameters.assets-bucket-production >>
+                ;;
+              staging)
+                bucket=<< pipeline.parameters.assets-bucket-staging >>
+                ;;
+              improve-container) # Fix for CI building, TODO: Remove when CI is fixed
+                bucket=<< pipeline.parameters.assets-bucket-staging >>
+                ;;
+              *) # TODO: Should break the build if no branch matches
+                bucket="empty"
+                echo "Unmanaged branch ${CIRCLE_BRANCH}"
+                exit 1
+                ;;
+            esac && \
+            aws s3 cp ./public-assets s3://${bucket}/assets/ --recursive && \
+            docker rm -v $id
+      - run:
+          name: Save Docker image layer cache
+          command: |
+            mkdir -p /tmp/caches
+            docker save -o /tmp/caches/app.tar ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+      - save_cache:
+          key: v1-{{ .Branch }}-{{ epoch }}
+          paths:
+            - /tmp/caches/app.tar
+      - run:
+          name: Push application Docker image
+          command: |
+            # if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              rm -rf ~/.aws
+              aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+              docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.project-name >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+            # fi
+
+workflows:
+  version: 2
+  "workflow":
+    jobs:
+      - build:
+          context:
+            - Github
+            - AWS_ECR
