@@ -3,13 +3,24 @@ version: 2.1
 parameters:
   project-name:
     type: string
-    default: 'my-project' # must match pg_username and pg_database into database.yml.ci
+    default: "my-project"
   ruby-version:
     type: string
-    default: "2.7.1"
-  bundler-version:
+    default: "3.2.2"
+  rails-env:
     type: string
-    default: "2.2.16"
+    default: "staging"
+  db-adapter:
+    description: "DB adapter with version. Example: mysql:8. Will work with postgres and mysql"
+    type: string
+    default: "postgres:14"
+  branches-for-envs:
+    description: "List of branches matching environments for docker build and assets compilation"
+    type: string
+    default: "('master:production' 'staging')" # add any branch you want assets to be compiled on
+  assets-buckets:
+    type: string
+    default: "()" # must match branches-for-envs size and order, if not filled, it will be (assets-bucket-production assets-bucket-staging)
   assets-bucket-staging:
     type: string
     default: ""
@@ -50,7 +61,9 @@ commands: # a reusable command with parameters
          key: my-app-{{ checksum "Gemfile.lock" }}
       - run:
           name: Bundle install
-          command: bundle install --path vendor/bundle
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
       - save_cache:
           key: my-app-{{ checksum "Gemfile.lock" }}
           paths:
@@ -74,22 +87,62 @@ commands: # a reusable command with parameters
           name: Database initialization
           command: bundle exec rake db:create db:migrate
 jobs:
+  auto_cancel_redundant_workflows:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - run:
+          name: "cancel_redundant_workflows"
+          command: |
+            ## Get the name of the workflow and the related pipeline number
+            curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}" -o current_workflow.json
+            WF_NAME=$(jq -r '.name' current_workflow.json)
+            CURRENT_PIPELINE_NUM=$(jq -r '.pipeline_number' current_workflow.json)
+
+            ## Get the IDs of pipelines created by the current user on the same branch. (Only consider pipelines that have a pipeline number inferior to the current pipeline)
+            PIPE_IDS=$(curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=$CIRCLE_BRANCH"|jq -r --arg CIRCLE_USERNAME "$CIRCLE_USERNAME" --argjson CURRENT_PIPELINE_NUM "$CURRENT_PIPELINE_NUM" '.items[]|select(.state == "created")|select(.trigger.actor.login == $CIRCLE_USERNAME)|select(.number < $CURRENT_PIPELINE_NUM)|.id')
+
+            ## Get the IDs of currently running/on_hold workflows that have the same name as the current workflow, in all previously created pipelines.
+            if [ ! -z "$PIPE_IDS" ]; then
+              for PIPE_ID in $PIPE_IDS
+              do
+                curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/pipeline/${PIPE_ID}/workflow"|jq -r --arg WF_NAME "${WF_NAME}" '.items[]|select(.status == "on_hold" or .status == "running") | select(.name == $WF_NAME) | .id' >> WF_to_cancel.txt
+              done
+            fi
+
+            ## Cancel any currently running/on_hold workflow with the same name
+            if [ -s WF_to_cancel.txt ]; then
+              echo "Cancelling the following workflow(s):"
+              cat WF_to_cancel.txt
+              while read WF_ID;
+                do
+                  curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request POST https://circleci.com/api/v2/workflow/$WF_ID/cancel
+                done < WF_to_cancel.txt
+              ## Allowing some time to complete the cancellation
+              sleep 2
+              else
+                echo "Nothing to cancel"
+            fi
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.resource-class >>
     docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>-node
         environment:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
       - image: cimg/redis:6.2.6
-      - image: postgres:12
+      - image: << pipeline.parameters.db-adapter >>
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
           POSTGRES_DB: << pipeline.parameters.project-name >>
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: << pipeline.parameters.project-name >>
+          MYSQL_USER: << pipeline.parameters.project-name >>
+          MYSQL_PASSWORD: << pipeline.parameters.project-name >>
     parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
@@ -97,55 +150,14 @@ jobs:
           name: Test
           command: |
             yarn
+            rake javascript:build 2>&1 || true
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run)
-  assets:
-    working_directory: ~/<< pipeline.parameters.project-name >>
-    resource_class: << pipeline.parameters.assets-resource-class >>
-    docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
-        environment:
-          PGHOST: localhost
-          PGUSER: << pipeline.parameters.project-name >>
-          RAILS_ENV: test
-      - image: postgres:12
-        environment:
-          POSTGRES_USER: << pipeline.parameters.project-name >>
-          POSTGRES_DB: << pipeline.parameters.project-name >>
-          POSTGRES_PASSWORD: ""
-          POSTGRES_HOST_AUTH_METHOD: trust
-    steps:
-      - setup_env
-      - run:
-          name: "Compile and serve assets"
-          command: |
-            if [ $CIRCLE_BRANCH == staging ]
-            then
-              export ASSETS_ENV=staging
-              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-staging >>
-            elif [ $CIRCLE_BRANCH == master ]
-            then
-              export ASSETS_ENV=production
-              export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket-production >>
-            else
-              exit 0
-            fi
-
-            yarn
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
-            aws s3 cp public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
-
-            if [ -d "public/packs" ]; then
-              aws s3 cp public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
-            else
-              echo "No public/packs directory, skipping packs upload."
-            fi
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
     docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>
         environment:
           RAILS_ENV: test
     steps:
@@ -180,16 +192,72 @@ jobs:
             brakeman -o security/brakeman.html || true
       - store_artifacts:
           path: security/brakeman.html
+
+  assets:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.assets-resource-class >>
+    docker:
+      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>-node
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+      - image: << pipeline.parameters.db-adapter >>
+        environment:
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: << pipeline.parameters.project-name >>
+          MYSQL_USER: << pipeline.parameters.project-name >>
+          MYSQL_PASSWORD: << pipeline.parameters.project-name >>
+
+    steps:
+      - setup_env
+      - run:
+          name: "Compile and serve assets"
+          command: |
+            branches=<< pipeline.parameters.branches-for-envs >>
+            assetsBuckets=<< pipeline.parameters.assets-buckets >>
+
+            if [ ${#assetsBuckets[@]} -eq 0 ]; then
+              assetsBuckets=('<< pipeline.parameters.assets-bucket-production >>' '<< pipeline.parameters.assets-bucket-staging >>
+            fi
+
+            for i in "${!branches[@]}"; do
+              if [ $CIRCLE_BRANCH == ${branches[$i]%%:*} ]; then
+                current_env=${branches[$i]##*:}
+                bucket=${assetsBuckets[$i]}
+              fi
+            done
+
+            if [[ -z "${bucket}" ]]; then
+              echo "S3 bucket variable has not been set for env ${current_env}. Skipping assets compilation."
+              exit 0
+            fi
+
+            yarn
+            RAILS_ENV=${current_env} bundle exec rake db:create db:migrate
+            RAILS_ENV=${current_env} bundle exec rake assets:clobber assets:precompile
+            aws s3 cp public/assets/ s3://${bucket}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+
+            if [ -d "public/packs" ]; then
+              aws s3 cp public/packs/ s3://${bucket}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+            else
+              echo "No public/packs directory, skipping packs upload."
+            fi
+
 workflows:
-    version: 2
-    'workflow':
-        jobs:
-            - spec
-            - security_check
-            - assets:
-                context:
-                  - ASSETS
-                filters:
-                  branches:
-                    only: ['master', 'staging']
-                requires: ['spec', 'security_check']
+  version: 2
+  workflow:
+    jobs:
+        - auto_cancel_redundant_workflows:
+            context:
+              - COMMON
+        - spec
+        - security_check
+        - assets:
+            context:
+              - ASSETS
+            requires: ['spec', 'security_check']
