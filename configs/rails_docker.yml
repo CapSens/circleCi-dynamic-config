@@ -327,7 +327,7 @@ jobs:
 
             cat \<<- EOF >> ~/.aws/config
             [profile deployer]
-            role_arn = arn:aws:iam::396522184519:role/eks_admin_<< pipeline.parameters.k8s-cluster >>
+            role_arn = arn:aws:iam::396522184519:role/eks_cluster_admin_<< pipeline.parameters.k8s-cluster >>
             source_profile = default
             EOF
 
@@ -335,7 +335,7 @@ jobs:
           name: Kubeconfig initialization
           command: |
             cd terraform_infra
-            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=admin
+            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=cluster_admin
 
       - run:
           name: Terraform deploy
