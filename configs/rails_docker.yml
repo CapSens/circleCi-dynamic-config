@@ -87,7 +87,12 @@ commands: # a reusable command with parameters
       - run:
           name: Install Bundler
           # mettre ici la meme version que celle utilisée pour générer le gemfile.lock sinon le cache ne marchera pas
-          command: gem install bundler:<< pipeline.parameters.bundler-version >>
+          command: |
+            if [ -n "<< pipeline.parameters.bundler-version >>" ]; then
+              gem install bundler:<< pipeline.parameters.bundler-version >>
+            else
+              gem install bundler
+            fi
       - restore_cache:
          key: my-app-{{ checksum "Gemfile.lock" }}
       - run:
