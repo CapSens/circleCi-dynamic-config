@@ -4,6 +4,8 @@ ARG RUBY_VERSION
 ARG DISTRO_NAME=bullseye
 
 FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME as base
+SHELL ["/bin/bash", "-c"]
+
 RUN echo "IRB.conf[:HISTORY_FILE] = ENV['IRB_HISTFILE']" >> ~/.irbrc
 
 ARG DISTRO_NAME
@@ -124,29 +126,16 @@ COPY --chown=my_user:my_user . .
 # Install JS packages
 RUN yarn install --check-files
 
-# Precompile assets
-# NOTE: The command may require adding some environment variables (e.g., SECRET_KEY_BASE) if you're not using
-# credentials.
-ENV SECRET_KEY_BASE=foo \
-  DEFAULT_EMAIL=foo@bar.com \
-  REDIS_URL=redis://localhost:6379 \
-  REDIS_DB=0 \
-  S3_KEY=foo \
-  S3_BUCKET=foo \
-  S3_SECRET=foo
-
 ARG DB_ADAPTER=postgresql
 ENV DB_NAME=fake_database_name
 ENV DB_ADAPTER=$DB_ADAPTER
 # Copy database config to avoid human errors
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 
-ARG REQUIRED_VARIABLES
-RUN echo "REQUIRED_VARIABLES: $REQUIRED_VARIABLES"
-RUN for required_variable in $REQUIRED_VARIABLES; do \
-    export "$required_variable=foo" ; \
-    done; \
-    bundle exec rake assets:precompile
+# Precompile assets
+# NOTE: The app may require some environment variables (e.g., SECRET_KEY_BASE). All known mandatory variables
+# are listed with fake values in .dockerdev/env_variables.sh script and exported below
+RUN (source .dockerdev/.env && bundle exec rake assets:clobber assets:precompile)
 
 # Finally, our production image definition
 # NOTE: It's not extending the base image, it's a new one
