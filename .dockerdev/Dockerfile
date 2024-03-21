@@ -135,7 +135,13 @@ COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/
 # Precompile assets
 # NOTE: The app may require some environment variables (e.g., SECRET_KEY_BASE). All known mandatory variables
 # are listed with fake values in .dockerdev/env_variables.sh script and exported below
-RUN (source .dockerdev/.env && bundle exec rake assets:clobber assets:precompile)
+RUN ( \
+  source .dockerdev/.env \
+  && env_file_name=./config/environments/${RAILS_ENV}.rb \
+  && echo 'Rails.application.config.require_master_key = false' >> $env_file_name \
+  && bundle exec rake assets:clobber assets:precompile \
+  && sed -i '$ d' $env_file_name \
+)
 
 # Finally, our production image definition
 # NOTE: It's not extending the base image, it's a new one
@@ -176,7 +182,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=tmpfs,target=/var/log \
   apt-get update -qq && \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
-  $(grep -Ev '^\s*#' /tmp/Aptfile | xargs)
+  $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INTALL | xargs -n1 | sort -u | xargs)
 
 # add policy to allow convert images to PDF with imagemagick if it's installed
 RUN if command -v convert &> /dev/null; \

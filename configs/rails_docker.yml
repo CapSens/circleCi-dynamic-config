@@ -24,6 +24,10 @@ parameters:
   ruby-docker-distro:
     type: string
     default: "bullseye"
+  packages-to-install:
+    description: "space separated list of packages to install on docker image"
+    type: string
+    default: ""
   bundler-version:
     description: "leave empty to use latest version"
     type: string
@@ -40,6 +44,10 @@ parameters:
     description: "any not empty value will force node to be installed in final docker image"
     type: string
     default: ""
+  node-version:
+    description: "version of node to install"
+    type: string
+    default: "16"
   ignored_cves:
     type: string
     default: ""
@@ -297,8 +305,9 @@ jobs:
               --build-arg BUNDLER_VERSION=<< pipeline.parameters.bundler-version >> \
               --build-arg DB_ADAPTER=<< pipeline.parameters.db-adapter-for-build >> \
               --build-arg FORCE_NODE=<< pipeline.parameters.force-node >> \
-              --build-arg NODE_MAJOR=16 \
+              --build-arg NODE_MAJOR=<< pipeline.parameters.node-version >> \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+              --build-arg PACKAGES_TO_INSTALL=<< pipeline.parameters.packages-to-install >> \
               --file .dockerdev/Dockerfile \
               .
       - run:
