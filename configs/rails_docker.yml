@@ -84,6 +84,10 @@ parameters:
     description: "terraform workspace name"
     type: string
     default: ""
+  use-docker-cache:
+    description: "use docker cache. Set to false to force rebuild of all layers in the docker image"
+    type: boolean
+    default: true
 
 commands: # a reusable command with parameters
   setup_env:
@@ -288,7 +292,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: << pipeline.parameters.use-docker-cache >>
       - run:
           name: Download shared Dockerfile and utils
           command: |
