@@ -307,7 +307,7 @@ jobs:
               --build-arg FORCE_NODE=<< pipeline.parameters.force-node >> \
               --build-arg NODE_MAJOR=<< pipeline.parameters.node-version >> \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
-              --build-arg PACKAGES_TO_INSTALL=<< pipeline.parameters.packages-to-install >> \
+              --build-arg PACKAGES_TO_INSTALL="<< pipeline.parameters.packages-to-install >>" \
               --file .dockerdev/Dockerfile \
               .
       - run:
