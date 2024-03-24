@@ -176,13 +176,14 @@ RUN test -n "$FORCE_NODE" \
   && apt-get install nodejs -y --no-install-recommends \
   || echo "nodejs not mandatory for production environment"
 
+ARG PACKAGES_TO_INSTALL=""
 COPY .dockerdev/Aptfile /tmp/Aptfile
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   --mount=type=tmpfs,target=/var/log \
   apt-get update -qq && \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
-  $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INTALL | xargs -n1 | sort -u | xargs)
+  $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
 
 # add policy to allow convert images to PDF with imagemagick if it's installed
 RUN if command -v convert &> /dev/null; \
