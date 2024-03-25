@@ -231,8 +231,9 @@ COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/
 # 1) Installed gems
 COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
 # 2) Compiled assets
-COPY --from=production-builder /home/my_user/app/public/assets /home/my_user/app/public/assets
-COPY --from=production-builder /home/my_user/app/public/packs /home/my_user/app/public/packs
+COPY --from=production-builder /home/my_user/app/public/asset[s]/ /home/my_user/app/public/assets
+# pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
+COPY --from=production-builder /home/my_user/app/public/pack[s]/ /home/my_user/app/public/packs
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
 COPY --chown=my_user:my_user --from=production-builder /home/my_user/app/tmp/cache/bootsnap* /home/my_user/app/tmp/cache/
 
