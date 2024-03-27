@@ -51,12 +51,9 @@ parameters:
   ignored_cves:
     type: string
     default: ""
-  install-redis:
-    type: boolean
-    default: false
-  install-tesseract:
-    type: boolean
-    default: false
+  packages-for-tests:
+    type: string
+    default: ""
   tests-parallelism:
     type: integer
     default: 1
@@ -117,20 +114,12 @@ commands: # a reusable command with parameters
           paths:
               - vendor/bundle
       - when:
-          condition: << pipeline.parameters.install-redis >>
-          steps:
-            - run:
-                name: Redis
-                command: |
-                  apt-get install -y redis-server
-                  service redis-server start
-      - when:
-          condition: << pipeline.parameters.install-tesseract >>
+          condition: << pipeline.parameters.packages-for-tests >>
           steps:
             - run:
                 name: Tesseract OCR
                 command: |
-                  apt-get install -y tesseract-ocr
+                  apt-get install -y << pipeline.parameters.packages-for-tests >>
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
