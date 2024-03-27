@@ -1,0 +1,424 @@
+version: 2.1
+
+orbs:
+  terraform: circleci/terraform@3.1.0
+  kubernetes: circleci/kubernetes@1.3.1
+
+parameters:
+  action:
+    description: "worflow to trigger. must be in [tests, build-and-deploy, deploy, undeploy]"
+    type: string
+    default: "tests"
+  project-name:
+    type: string
+    default: "my-project"
+  ruby-version:
+    type: string
+    default: "3.2.2"
+  rails-env:
+    type: string
+    default: "staging"
+  assets-bucket:
+    type: string
+    default: ""
+  ruby-docker-distro:
+    type: string
+    default: "bullseye"
+  packages-to-install:
+    description: "space separated list of packages to install on docker image"
+    type: string
+    default: ""
+  bundler-version:
+    description: "leave empty to use latest version"
+    type: string
+    default: ""
+  db-adapter-for-build:
+    description: "Use nulldb (activerecord-nulldb-adapter gem) for apps that needs to connect to database on initialization"
+    type: string
+    default: "postgresql"
+  required-variables:
+    description: "space separated list of required ENV variables to run rails application"
+    type: string
+    default: ""
+  force-node:
+    description: "any not empty value will force node to be installed in final docker image"
+    type: string
+    default: ""
+  node-version:
+    description: "version of node to install"
+    type: string
+    default: "16"
+  ignored_cves:
+    type: string
+    default: ""
+  install-redis:
+    type: boolean
+    default: false
+  install-tesseract:
+    type: boolean
+    default: false
+  tests-parallelism:
+    type: integer
+    default: 1
+  resource-class:
+    description: "Allow usage of difference resource class to reduce costs"
+    type: string
+    default: "medium"
+  assets-resource-class: # platforms with webpacker needs a bigger instance than small
+    description: "Allow usage of difference resource class for assets compilation"
+    type: string
+    default: "small"
+  ecr-repository:
+    description: "ECR repository name"
+    type: string
+    default: ""
+  tfvars:
+    description: "Base64 encrypted tfvars file for terraform deployment"
+    type: string
+    default: ""
+  k8s-cluster:
+    description: "eks cluster name to deploy the application"
+    type: string
+    default: ""
+  workspace:
+    description: "terraform workspace name"
+    type: string
+    default: ""
+  use-docker-cache:
+    description: "use docker cache. Set to false to force rebuild of all layers in the docker image"
+    type: boolean
+    default: true
+
+commands: # a reusable command with parameters
+  setup_env:
+    steps:
+      - checkout
+      - run:
+          name: Database Config
+          command: cp config/database.yml.ci config/database.yml
+      - run:
+          name: Install Bundler
+          # mettre ici la meme version que celle utilisée pour générer le gemfile.lock sinon le cache ne marchera pas
+          command: |
+            if [ -n "<< pipeline.parameters.bundler-version >>" ]; then
+              gem install bundler:<< pipeline.parameters.bundler-version >>
+            else
+              gem install bundler
+            fi
+      - restore_cache:
+         key: my-app-{{ checksum "Gemfile.lock" }}
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - save_cache:
+          key: my-app-{{ checksum "Gemfile.lock" }}
+          paths:
+              - vendor/bundle
+      - when:
+          condition: << pipeline.parameters.install-redis >>
+          steps:
+            - run:
+                name: Redis
+                command: |
+                  apt-get install -y redis-server
+                  service redis-server start
+      - when:
+          condition: << pipeline.parameters.install-tesseract >>
+          steps:
+            - run:
+                name: Tesseract OCR
+                command: |
+                  apt-get install -y tesseract-ocr
+      - run:
+          name: Database initialization
+          command: bundle exec rake db:create db:migrate
+
+  setup_terraform:
+    steps:
+      - checkout
+      - terraform/install:
+          arch: amd64
+          os: linux
+          terraform_version: 1.6.2
+      - kubernetes/install-kubectl
+
+      - run:
+          name: Clone Terraform repository
+          command: |
+            git clone https://x-access-token:$GITHUB_TOKEN@github.com/CapSens/terraform-infra.git terraform_infra
+
+      - run:
+          name: Create tfvars file
+          command: |
+            decrypted_tfvars=$(
+              echo "<< pipeline.parameters.tfvars >>" |
+              openssl enc -base64 -d -aes-256-cbc -salt -pass pass:${TERRAFORM_ENCRYPTION_KEY} -pbkdf2
+            )
+            cd terraform_infra
+            mkdir -p live/rails_application
+            tfvars_file="live/rails_application/tfvars/<< pipeline.parameters.workspace >>.tfvars"
+            touch $tfvars_file
+            echo "${decrypted_tfvars}" > $tfvars_file
+
+      - run:
+          name: Assume admin role for k8s cluster
+          command: |
+            aws --profile default configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
+            aws --profile default configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
+            aws --profile default configure set default.region eu-west-1
+
+            cat \<<- EOF >> ~/.aws/config
+            [profile deployer]
+            role_arn = arn:aws:iam::396522184519:role/eks_cluster_admin_<< pipeline.parameters.k8s-cluster >>
+            source_profile = default
+            EOF
+
+      - run:
+          name: Kubeconfig initialization
+          command: |
+            cd terraform_infra
+            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=cluster_admin
+
+jobs:
+  auto_cancel_redundant_workflows:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - run:
+          name: "cancel_redundant_workflows"
+          command: |
+            ## Get the name of the workflow and the related pipeline number
+            curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}" -o current_workflow.json
+            WF_NAME=$(jq -r '.name' current_workflow.json)
+            CURRENT_PIPELINE_NUM=$(jq -r '.pipeline_number' current_workflow.json)
+
+            ## Get the IDs of pipelines created by the current user on the same branch. (Only consider pipelines that have a pipeline number inferior to the current pipeline)
+            PIPE_IDS=$(curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=$CIRCLE_BRANCH"|jq -r --arg CIRCLE_USERNAME "$CIRCLE_USERNAME" --argjson CURRENT_PIPELINE_NUM "$CURRENT_PIPELINE_NUM" '.items[]|select(.state == "created")|select(.trigger.actor.login == $CIRCLE_USERNAME)|select(.number < $CURRENT_PIPELINE_NUM)|.id')
+
+            ## Get the IDs of currently running/on_hold workflows that have the same name as the current workflow, in all previously created pipelines.
+            if [ ! -z "$PIPE_IDS" ]; then
+              for PIPE_ID in $PIPE_IDS
+              do
+                curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/pipeline/${PIPE_ID}/workflow"|jq -r --arg WF_NAME "${WF_NAME}" '.items[]|select(.status == "on_hold" or .status == "running") | select(.name == $WF_NAME) | .id' >> WF_to_cancel.txt
+              done
+            fi
+
+            ## Cancel any currently running/on_hold workflow with the same name
+            if [ -s WF_to_cancel.txt ]; then
+              echo "Cancelling the following workflow(s):"
+              cat WF_to_cancel.txt
+              while read WF_ID;
+                do
+                  curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request POST https://circleci.com/api/v2/workflow/$WF_ID/cancel
+                done < WF_to_cancel.txt
+              ## Allowing some time to complete the cancellation
+              sleep 2
+              else
+                echo "Nothing to cancel"
+            fi
+  spec:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+      - image: cimg/redis:6.2.6
+      - image: postgres:12
+        environment:
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+    parallelism: << pipeline.parameters.tests-parallelism >>
+    steps:
+      - setup_env
+      - run:
+          name: Test
+          command: |
+            yarn
+            circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
+            bundle exec rspec $(cat /tmp/tests-to-run)
+  security_check:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: small
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          RAILS_ENV: test
+    steps:
+      - checkout
+      - run:
+          name: "Audit Securité du Gemfile"
+          command: |
+            gem install bundler-audit
+
+            IGNORE="<< pipeline.parameters.ignored_cves >>"
+            set +e
+            OAUTH_CRSF_FOUND=`grep -c -m1 omniauth-rails_csrf_protection Gemfile`
+            SHRINE_CHECK=`grep -hrc derivation_endpoint -- config/initializers app/uploaders | awk '{s+=$1} END {print s}'`
+            set -e
+            if [ $OAUTH_CRSF_FOUND -eq 1 ]; then
+              IGNORE="$IGNORE CVE-2015-9284"
+            fi
+            if [ $SHRINE_CHECK -eq 0 ]; then
+              IGNORE="$IGNORE CVE-2020-15237"
+            fi
+            IGNORE="$IGNORE CVE-2023-26141"
+            if [ -n "$IGNORE" ]; then
+              IGNORE="--ignore $IGNORE"
+            fi
+
+            bundle audit --update $IGNORE
+      - run:
+          name: "Audit de securité de l'application"
+          command: |
+            gem install brakeman -v 5.4.1
+            mkdir -p security
+            brakeman -o security/brakeman.html || true
+      - store_artifacts:
+          path: security/brakeman.html
+
+  build:
+    working_directory: /tmp/app
+    environment:
+      DOCKER_REGISTRY: 396522184519.dkr.ecr.eu-west-1.amazonaws.com
+    docker:
+      - image: cimg/aws:2023.09
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: << pipeline.parameters.use-docker-cache >>
+      - run:
+          name: Download shared Dockerfile and utils
+          command: |
+            git clone --depth 1 --branch test-ci-build-vic git@github.com:CapSens/circleCi-dynamic-config.git dynamic_configs
+            cp -R dynamic_configs/.dockerdev ./
+            rm -rf dynamic_configs
+      - run:
+          name: Build application Docker image
+          command: |
+            docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
+              --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
+              --build-arg RAILS_ENV=<< pipeline.parameters.rails-env >> \
+              --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
+              --build-arg BUNDLER_VERSION=<< pipeline.parameters.bundler-version >> \
+              --build-arg DB_ADAPTER=<< pipeline.parameters.db-adapter-for-build >> \
+              --build-arg FORCE_NODE=<< pipeline.parameters.force-node >> \
+              --build-arg NODE_MAJOR=<< pipeline.parameters.node-version >> \
+              --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+              --build-arg PACKAGES_TO_INSTALL="<< pipeline.parameters.packages-to-install >>" \
+              --file .dockerdev/Dockerfile \
+              .
+      - run:
+          name: Extract assets from container and push to s3
+          command: |
+            current_env=<< pipeline.parameters.rails-env >>
+            bucket=<< pipeline.parameters.assets-bucket >>
+
+            if [[ -z "${bucket}" ]]; then
+              echo "S3 bucket variable has not been set for env ${current_env}. Skipping assets compilation."
+              exit 0
+            else
+              echo "ready to copy assets for env ${current_env} on assets bucket ${bucket}"
+
+              id=$(docker create ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1})
+
+              docker cp $id:/home/my_user/app/public/assets public-assets && rm public-assets/manifest.json && \
+              aws s3 cp ./public-assets s3://${bucket}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+
+              if docker cp $id:/home/my_user/app/public/packs public-packs > /dev/null 2>&1 ; then
+                aws s3 cp ./public-packs s3://${bucket}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+              else
+                echo "No public/packs directory, skipping packs upload."
+              fi
+
+              docker rm -v $id
+            fi
+      - run:
+          name: Push application Docker image
+          command: |
+            rm -rf ~/.aws
+            aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+            docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+
+  deploy:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    docker:
+      - image: cimg/aws:2023.09
+    steps:
+      - setup_terraform
+      - run:
+          name: Terraform deploy
+          command: |
+            cd terraform_infra
+            make init project=rails_application
+            make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
+            make apply project=rails_application workspace=<< pipeline.parameters.workspace >> extra_args=-auto-approve
+
+  undeploy:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    docker:
+      - image: cimg/aws:2023.09
+    steps:
+      - setup_terraform
+      - run:
+          name: Terraform deploy
+          command: |
+            cd terraform_infra
+            make init project=rails_application
+            make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
+            make destroy project=rails_application workspace=<< pipeline.parameters.workspace >> extra_args=-auto-approve
+
+workflows:
+  version: 2
+
+  workflow:
+    when:
+      equal: [ tests, << pipeline.parameters.action >> ]
+
+    jobs:
+        - auto_cancel_redundant_workflows:
+            context:
+              - COMMON
+        - spec
+        - security_check
+
+  build-and-deploy:
+    when:
+      equal: [ build-and-deploy, << pipeline.parameters.action >> ]
+
+    jobs:
+        - build:
+            context:
+              - GithubDev
+              - AWS_ECR
+        - deploy:
+            requires:
+              - build
+            context:
+              - GithubDev
+              - AWS_ECR
+
+  deploy:
+    when:
+      equal: [ deploy, << pipeline.parameters.action >> ]
+
+    jobs:
+        - deploy:
+            context:
+              - GithubDev
+              - AWS_ECR
+
+  undeploy:
+    when:
+      equal: [ undeploy, << pipeline.parameters.action >> ]
+    jobs:
+        - undeploy:
+            context:
+                - GithubDev
+                - AWS_ECR
