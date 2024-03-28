@@ -65,8 +65,12 @@ ENV BUNDLE_APP_CONFIG=.bundle
 
 ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
-RUN (test -n "$BUNDLER_VERSION" && gem install bundler:$BUNDLER_VERSION) \
-  || (gem update --system && gem install bundler)
+RUN if test -n "$BUNDLER_VERSION" ; \
+  then \
+    gem install bundler:$BUNDLER_VERSION) \
+  else \
+    gem update --system && gem install bundler \
+  fi
 
 # Create a directory for the app code
 RUN mkdir -p /app
@@ -147,6 +151,7 @@ RUN ( \
 # Finally, our production image definition
 # NOTE: It's not extending the base image, it's a new one
 FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME AS production
+SHELL ["/bin/bash", "-c"]
 
 # Production-only dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -199,8 +204,12 @@ RUN if command -v convert &> /dev/null; \
 
 ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
-RUN (test -n "$BUNDLER_VERSION" && gem install bundler:$BUNDLER_VERSION) \
-  || (gem update --system && gem install bundler)
+RUN if test -n "$BUNDLER_VERSION" ; \
+  then \
+    gem install bundler:$BUNDLER_VERSION) \
+  else \
+    gem update --system && gem install bundler \
+  fi
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
 RUN groupadd --gid 1005 my_user \
