@@ -67,9 +67,9 @@ ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
 RUN if test -n "$BUNDLER_VERSION" ; \
   then \
-    gem install bundler:$BUNDLER_VERSION \
+    gem install bundler:$BUNDLER_VERSION ; \
   else \
-    gem update --system && gem install bundler \
+    gem update --system && gem install bundler ; \
   fi
 
 # Create a directory for the app code
@@ -206,9 +206,9 @@ ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
 RUN if test -n "$BUNDLER_VERSION" ; \
   then \
-    gem install bundler:$BUNDLER_VERSION \
+    gem install bundler:$BUNDLER_VERSION ; \
   else \
-    gem update --system && gem install bundler \
+    gem update --system && gem install bundler ; \
   fi
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
