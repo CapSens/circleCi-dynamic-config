@@ -153,6 +153,13 @@ RUN ( \
 FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME AS production
 SHELL ["/bin/bash", "-c"]
 
+# Create and configure a dedicated user (use the same name as for the production-builder image)
+RUN groupadd --gid 1005 my_user \
+  && useradd --uid 1005 --gid my_user --shell /bin/bash --create-home my_user
+RUN mkdir /home/my_user/app
+WORKDIR /home/my_user/app
+USER my_user
+
 # Production-only dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -202,22 +209,6 @@ RUN if command -v convert &> /dev/null; \
     echo "imagemagick not mandatory for production environment"; \
   fi
 
-ARG BUNDLER_VERSION
-# Upgrade RubyGems and install the latest Bundler version
-RUN if test -n "$BUNDLER_VERSION" ; \
-  then \
-    gem install bundler:$BUNDLER_VERSION ; \
-  else \
-    gem update --system && gem install bundler ; \
-  fi
-
-# Create and configure a dedicated user (use the same name as for the production-builder image)
-RUN groupadd --gid 1005 my_user \
-  && useradd --uid 1005 --gid my_user --shell /bin/bash --create-home my_user
-RUN mkdir /home/my_user/app
-WORKDIR /home/my_user/app
-USER my_user
-
 ARG RAILS_ENV
 # Ruby/Rails env configuration
 ENV RAILS_ENV=$RAILS_ENV \
@@ -228,6 +219,15 @@ ENV RAILS_ENV=$RAILS_ENV \
   LANG=C.UTF-8 \
   LC_ALL=C.UTF-8 \
   LD_PRELOAD=libjemalloc.so.2
+
+ARG BUNDLER_VERSION
+# Upgrade RubyGems and install the latest Bundler version
+RUN if test -n "$BUNDLER_VERSION" ; \
+  then \
+    gem install bundler:$BUNDLER_VERSION ; \
+  else \
+    gem update --system && gem install bundler ; \
+  fi
 
 EXPOSE 3000
 
