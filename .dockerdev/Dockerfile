@@ -153,13 +153,6 @@ RUN ( \
 FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME AS production
 SHELL ["/bin/bash", "-c"]
 
-# Create and configure a dedicated user (use the same name as for the production-builder image)
-RUN groupadd --gid 1005 my_user \
-  && useradd --uid 1005 --gid my_user --shell /bin/bash --create-home my_user
-RUN mkdir /home/my_user/app
-WORKDIR /home/my_user/app
-USER my_user
-
 # Production-only dependencies
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -208,6 +201,13 @@ RUN if command -v convert &> /dev/null; \
   else \
     echo "imagemagick not mandatory for production environment"; \
   fi
+
+# Create and configure a dedicated user (use the same name as for the production-builder image)
+RUN groupadd --gid 1005 my_user \
+  && useradd --uid 1005 --gid my_user --shell /bin/bash --create-home my_user
+RUN mkdir /home/my_user/app
+WORKDIR /home/my_user/app
+USER my_user
 
 ARG RAILS_ENV
 # Ruby/Rails env configuration
