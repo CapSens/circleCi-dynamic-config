@@ -67,7 +67,7 @@ ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
 RUN if test -n "$BUNDLER_VERSION" ; \
   then \
-    gem install bundler:$BUNDLER_VERSION) \
+    gem install bundler:$BUNDLER_VERSION \
   else \
     gem update --system && gem install bundler \
   fi
@@ -206,7 +206,7 @@ ARG BUNDLER_VERSION
 # Upgrade RubyGems and install the latest Bundler version
 RUN if test -n "$BUNDLER_VERSION" ; \
   then \
-    gem install bundler:$BUNDLER_VERSION) \
+    gem install bundler:$BUNDLER_VERSION \
   else \
     gem update --system && gem install bundler \
   fi
