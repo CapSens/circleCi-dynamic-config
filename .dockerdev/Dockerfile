@@ -137,6 +137,7 @@ COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/
 # are listed with fake values in .dockerdev/env_variables.sh script and exported below
 RUN ( \
   source .dockerdev/.env \
+  && env \
   && env_file_name=./config/environments/${RAILS_ENV}.rb \
   && echo 'Rails.application.config.require_master_key = false' >> $env_file_name \
   && bundle exec rake assets:clobber assets:precompile \
