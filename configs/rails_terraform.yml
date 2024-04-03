@@ -141,16 +141,10 @@ commands: # a reusable command with parameters
       - run:
           name: Create tfvars file
           command: |
-            decrypted_tfvars=$(
-              echo "<< pipeline.parameters.tfvars >>" |
-              openssl enc -base64 -d -aes-256-cbc -salt -pass pass:${TERRAFORM_ENCRYPTION_KEY} -pbkdf2 |
-              gunzip
-            )
             cd terraform_infra
             mkdir -p live/rails_application
             tfvars_file="live/rails_application/tfvars/<< pipeline.parameters.workspace >>.tfvars"
-            touch $tfvars_file
-            echo "${decrypted_tfvars}" > $tfvars_file
+            aws s3 cp s3://capsens-terraform-tfvars/<< pipeline.parameters.tfvars >> $tfvars_file
 
       - run:
           name: Assume admin role for k8s cluster
