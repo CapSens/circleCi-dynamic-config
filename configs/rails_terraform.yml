@@ -143,7 +143,8 @@ commands: # a reusable command with parameters
           command: |
             decrypted_tfvars=$(
               echo "<< pipeline.parameters.tfvars >>" |
-              openssl enc -base64 -d -aes-256-cbc -salt -pass pass:${TERRAFORM_ENCRYPTION_KEY} -pbkdf2
+              openssl enc -base64 -d -aes-256-cbc -salt -pass pass:${TERRAFORM_ENCRYPTION_KEY} -pbkdf2 |
+              gunzip
             )
             cd terraform_infra
             mkdir -p live/rails_application
