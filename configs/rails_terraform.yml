@@ -285,6 +285,10 @@ jobs:
             cp -R dynamic_configs/.dockerdev ./
             rm -rf dynamic_configs
       - run:
+          name: Add file with git current revision
+          command: |
+            echo "${CIRCLE_SHA1}" > ./.current_revision.txt
+      - run:
           name: Build application Docker image
           command: |
             docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
