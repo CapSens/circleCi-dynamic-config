@@ -115,7 +115,8 @@ RUN mkdir $BUNDLE_PATH \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
   && bundle config --local path "${BUNDLE_PATH}" \
   && bundle config --local without "development:test" \
-  && bundle install --jobs=${BUNDLE_JOBS} --deployment --clean --no-cache \
+  && bundle lock --add-platform x86_64-linux || 0 \
+  && bundle install --jobs=${BUNDLE_JOBS} --deployment --clean \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
 
