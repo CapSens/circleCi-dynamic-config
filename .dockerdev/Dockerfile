@@ -67,7 +67,7 @@ ENV BUNDLE_APP_CONFIG=.bundle
 RUN if echo "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system ; \
-  fi ; \
+  fi ;
 
 # Create a directory for the app code
 RUN mkdir -p /app
