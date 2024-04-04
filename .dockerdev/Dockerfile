@@ -63,12 +63,11 @@ ENV BUNDLE_APP_CONFIG=.bundle
 # Uncomment this line if you want to run binstubs without prefixing with `bin/` or `bundle exec`
 # ENV PATH /app/bin:$PATH
 
-# Upgrade RubyGems and install the latest Bundler version
+# Upgrade RubyGems if possible
 RUN if echo "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system ; \
   fi ; \
-  gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") ; \
 
 # Create a directory for the app code
 RUN mkdir -p /app
@@ -113,6 +112,7 @@ COPY --chown=my_user:my_user Gemfile Gemfile.lock ./
 RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
 
 RUN mkdir $BUNDLE_PATH \
+  && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") ; \
   && bundle config --local deployment 'true' \
   && bundle config --local path "${BUNDLE_PATH}" \
   && bundle config --local with "${RAILS_ENV}" \
@@ -218,13 +218,6 @@ ENV RAILS_ENV=$RAILS_ENV \
   LANG=C.UTF-8 \
   LC_ALL=C.UTF-8 \
   LD_PRELOAD=libjemalloc.so.2
-
-# Upgrade RubyGems and install the latest Bundler version
-RUN if echo "3.1\n$RUBY_VERSION" | sort -V -C ; \
-  then \
-    gem update --system ; \
-  fi ; \
-  gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") ; \
 
 EXPOSE 3000
 
