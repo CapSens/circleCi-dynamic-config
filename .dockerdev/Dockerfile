@@ -64,7 +64,7 @@ ENV BUNDLE_APP_CONFIG=.bundle
 # ENV PATH /app/bin:$PATH
 
 # Upgrade RubyGems if possible
-RUN if echo "3.1\n$RUBY_VERSION" | sort -V -C ; \
+RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system ; \
   fi ;
@@ -113,12 +113,9 @@ RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
 
 RUN mkdir $BUNDLE_PATH \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
-  && bundle config --local deployment 'true' \
   && bundle config --local path "${BUNDLE_PATH}" \
-  && bundle config --local with "${RAILS_ENV}" \
-  && bundle config --local clean 'true' \
-  && bundle config --local no-cache 'true' \
-  && bundle install --jobs=${BUNDLE_JOBS} \
+  && bundle config --local without "development:test" \
+  && bundle install --jobs=${BUNDLE_JOBS} --deployment --clean --no-cache \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
 
