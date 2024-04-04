@@ -112,7 +112,7 @@ COPY --chown=my_user:my_user Gemfile Gemfile.lock ./
 RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
 
 RUN mkdir $BUNDLE_PATH \
-  && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") ; \
+  && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
   && bundle config --local deployment 'true' \
   && bundle config --local path "${BUNDLE_PATH}" \
   && bundle config --local with "${RAILS_ENV}" \
