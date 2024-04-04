@@ -295,7 +295,6 @@ jobs:
               --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
               --build-arg RAILS_ENV=<< pipeline.parameters.rails-env >> \
               --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
-              --build-arg BUNDLER_VERSION=<< pipeline.parameters.bundler-version >> \
               --build-arg DB_ADAPTER=<< pipeline.parameters.db-adapter-for-build >> \
               --build-arg FORCE_NODE=<< pipeline.parameters.force-node >> \
               --build-arg NODE_MAJOR=<< pipeline.parameters.node-version >> \
