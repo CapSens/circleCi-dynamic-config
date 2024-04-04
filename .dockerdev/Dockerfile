@@ -114,9 +114,12 @@ RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
 RUN mkdir $BUNDLE_PATH \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
   && bundle config --local path "${BUNDLE_PATH}" \
+  && bundle config set deployment "true" \
+  && bundle config set clean "true" \
+  && bundle config set no-cache "true" \
   && bundle config --local without "development:test" \
   && bundle lock --add-platform x86_64-linux || true \
-  && bundle install --jobs=${BUNDLE_JOBS} --deployment --clean \
+  && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
 
@@ -198,6 +201,12 @@ RUN if command -v convert &> /dev/null; \
   else \
     echo "imagemagick not mandatory for production environment"; \
   fi
+
+# Upgrade RubyGems if possible
+RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
+  then \
+    gem update --system ; \
+  fi ;
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
 RUN groupadd --gid 1005 my_user \
