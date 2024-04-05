@@ -106,11 +106,6 @@ ENV RAILS_ENV=$RAILS_ENV \
   BUNDLE_GITHUB__COM=x-access-token:"$GITHUB_TOKEN" \
   LD_PRELOAD=libjemalloc.so.2
 
-# Install Ruby gems
-COPY --chown=my_user:my_user Gemfile Gemfile.lock ./
-
-RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
-
 # Copy code
 COPY --chown=my_user:my_user . .
 
@@ -122,6 +117,7 @@ RUN mkdir $BUNDLE_PATH \
   && bundle config set no-cache "true" \
   && bundle config --local without "development:test" \
   && bundle lock --add-platform x86_64-linux || true \
+  && sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
   && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
