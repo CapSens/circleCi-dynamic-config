@@ -111,6 +111,9 @@ COPY --chown=my_user:my_user Gemfile Gemfile.lock ./
 
 RUN sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock
 
+# Copy code
+COPY --chown=my_user:my_user . .
+
 RUN mkdir $BUNDLE_PATH \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
   && bundle config --local path "${BUNDLE_PATH}" \
@@ -122,9 +125,6 @@ RUN mkdir $BUNDLE_PATH \
   && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
-
-# Copy code
-COPY --chown=my_user:my_user . .
 
 # Install JS packages
 RUN yarn install --check-files
