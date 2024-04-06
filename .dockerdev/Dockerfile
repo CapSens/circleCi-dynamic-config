@@ -227,6 +227,9 @@ EXPOSE 3000
 # Copy code
 COPY --chown=my_user:my_user . .
 
+# Force Gemfile.lock to include platform x86_64-linux. Bundle install is run with this option as well
+RUN bundle lock --add-platform x86_64-linux || true
+
 # Copy database config to avoid human errors
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 
