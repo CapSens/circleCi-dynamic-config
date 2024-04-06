@@ -116,7 +116,7 @@ RUN mkdir $BUNDLE_PATH \
   && bundle config set clean "true" \
   && bundle config set no-cache "true" \
   && bundle config --local without "development:test" \
-  && bundle lock --add-platform x86_64-linux || true \
+  && bundle lock --add-platform x86_64-linux \
   && sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
   && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
@@ -227,15 +227,14 @@ EXPOSE 3000
 # Copy code
 COPY --chown=my_user:my_user . .
 
-# Force Gemfile.lock to include platform x86_64-linux. Bundle install is run with this option as well
-RUN bundle lock --add-platform x86_64-linux || true
-
 # Copy database config to avoid human errors
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 
 # Copy artifacts
 # 1) Installed gems
 COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
+# 1bis) Gemfile.lock updated with platform x86_64-linux
+COPY --from=production-builder /home/my_user/app/Gemfile.lock /home/my_user/app/Gemfile.lock
 # 2) Compiled assets
 COPY --from=production-builder /home/my_user/app/public/asset[s]/ /home/my_user/app/public/assets
 # pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
