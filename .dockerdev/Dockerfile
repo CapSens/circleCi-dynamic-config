@@ -66,7 +66,7 @@ ENV BUNDLE_APP_CONFIG=.bundle
 # Upgrade RubyGems if possible
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
-    gem update --system ; \
+    gem update --system --no-document; \
   fi ;
 
 # Create a directory for the app code
@@ -110,14 +110,15 @@ ENV RAILS_ENV=$RAILS_ENV \
 COPY --chown=my_user:my_user . .
 
 RUN mkdir $BUNDLE_PATH \
+  && sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
+  && bundle lock --add-platform x86_64-linux \
+  && bundle update --bundler \
   && bundle config --local path "${BUNDLE_PATH}" \
   && bundle config set deployment "true" \
   && bundle config set clean "true" \
   && bundle config set no-cache "true" \
   && bundle config --local without "development:test" \
-  && bundle lock --add-platform x86_64-linux \
-  && sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
   && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
@@ -201,7 +202,7 @@ RUN if command -v convert &> /dev/null; \
 # Upgrade RubyGems if possible
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
-    gem update --system ; \
+    gem update --system --no-document; \
   fi ;
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
