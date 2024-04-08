@@ -50,3 +50,6 @@ dump.rdb
 .rubocop.yml
 Gemfile.backup
 Gemfile.lock.backup
+
+# Ignore letter_opener config
+config/initializers/letter_opener*.rb
