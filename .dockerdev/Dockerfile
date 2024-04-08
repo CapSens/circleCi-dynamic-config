@@ -111,11 +111,11 @@ COPY --chown=my_user:my_user . .
 
 RUN mkdir $BUNDLE_PATH \
   && sed -ir 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
+  && sed -ir '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "allow-storage-on-s3"/' Gemfile \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
   && bundle lock --add-platform x86_64-linux \
   && bundle update --bundler \
   && bundle config --local path "${BUNDLE_PATH}" \
-  && bundle config set deployment "true" \
   && bundle config set clean "true" \
   && bundle config set no-cache "true" \
   && bundle config --local without "development:test" \
@@ -230,6 +230,7 @@ COPY --chown=my_user:my_user . .
 
 # Copy database config to avoid human errors
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
+COPY --chown=my_user:my_user .dockerdev/letter_opener_config.rb /home/my_user/app/config/initializers/letter_opener.rb
 
 # Copy artifacts
 # 1) Installed gems
