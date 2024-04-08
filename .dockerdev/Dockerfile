@@ -111,7 +111,7 @@ COPY --chown=my_user:my_user . .
 
 RUN mkdir $BUNDLE_PATH \
   && sed -i 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
-  && sed -i '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "allow-storage-on-s3"/' Gemfile \
+  && sed -i '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "master"/' Gemfile \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
   && bundle lock --add-platform x86_64-linux \
   && bundle update --bundler \
