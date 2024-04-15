@@ -228,6 +228,9 @@ EXPOSE 3000
 # Copy code
 COPY --chown=my_user:my_user . .
 
+# Configure Rails to allow public file server served by app server
+RUN sed -i 's/\(.*public_file_server\.enabled.*= \).*/\1true/' config/environments/${RAILS_ENV}.rb
+
 # Copy database config to avoid human errors
 COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 # Copy letter_opener config to use it with S3
