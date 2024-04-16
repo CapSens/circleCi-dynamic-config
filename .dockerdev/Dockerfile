@@ -67,6 +67,8 @@ ENV BUNDLE_APP_CONFIG=.bundle
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system --no-document; \
+  else \
+    gem update --system 3.2.3 --no-document; \
   fi ;
 
 # Create a directory for the app code
@@ -114,11 +116,11 @@ RUN mkdir $BUNDLE_PATH \
   && sed -i '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "master"/' Gemfile \
   && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
   && bundle lock --add-platform x86_64-linux \
-  && bundle update --bundler \
   && bundle config --local path "${BUNDLE_PATH}" \
   && bundle config set clean "true" \
   && bundle config set no-cache "true" \
   && bundle config --local without "development:test" \
+  && bundle update --bundler \
   && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
@@ -203,6 +205,8 @@ RUN if command -v convert &> /dev/null; \
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system --no-document; \
+  else \
+    gem update --system 3.2.3 --no-document; \
   fi ;
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
