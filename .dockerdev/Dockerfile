@@ -67,8 +67,9 @@ ENV BUNDLE_APP_CONFIG=.bundle
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system --no-document; \
-  else \
-    gem update --system 3.2.3 --no-document; \
+  elif echo -e "2.7\n$RUBY_VERSION" | sort -V -C ; \
+  then \
+    gem update --system 3.4.22 --no-document; \
   fi ;
 
 # Create a directory for the app code
@@ -114,13 +115,12 @@ COPY --chown=my_user:my_user . .
 RUN mkdir $BUNDLE_PATH \
   && sed -i 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
   && sed -i '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "master"/' Gemfile \
-  && gem install bundler:$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1 | tr -d " ") \
-  && bundle lock --add-platform x86_64-linux \
+  && bundle lock \
   && bundle config --local path "${BUNDLE_PATH}" \
   && bundle config set clean "true" \
   && bundle config set no-cache "true" \
   && bundle config --local without "development:test" \
-  && bundle update --bundler \
+  && bundle lock --add-platform x86_64-linux \
   && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/ruby/*/cache/* \
   && rm -rf /home/my_user/.bundle/cache/*
@@ -205,8 +205,9 @@ RUN if command -v convert &> /dev/null; \
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system --no-document; \
-  else \
-    gem update --system 3.2.3 --no-document; \
+  elif echo -e "2.7\n$RUBY_VERSION" | sort -V -C ; \
+  then \
+    gem update --system 3.4.22 --no-document; \
   fi ;
 
 # Create and configure a dedicated user (use the same name as for the production-builder image)
