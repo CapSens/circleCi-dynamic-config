@@ -230,6 +230,10 @@ jobs:
     steps:
       - setup_env
       - run:
+          name: Install libvips
+          command: |
+            apt-install libvips
+      - run:
           name: Test
           command: |
             yarn
