@@ -51,6 +51,15 @@ RUN apt-get install -y ca-certificates curl gnupg --no-install-recommends \
   && apt-get install nodejs -y --no-install-recommends \
   && npm install -g yarn
 
+ARG PACKAGES_TO_INSTALL=""
+COPY .dockerdev/Aptfile /tmp/Aptfile
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=tmpfs,target=/var/log \
+  apt-get update -qq && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+  $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
+
 # Configure bundler
 ENV LANG=C.UTF-8 \
   BUNDLE_JOBS=4 \
@@ -251,7 +260,7 @@ COPY --from=production-builder /home/my_user/app/public/asset[s]/ /home/my_user/
 # pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
 COPY --from=production-builder /home/my_user/app/public/pack[s]/ /home/my_user/app/public/packs
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
-COPY --chown=my_user:my_user --from=production-builder /home/my_user/app/tmp/cache/bootsnap* /home/my_user/app/tmp/cache/
+COPY --chown=my_user:my_user --from=production-builder /home/my_user/app/tmp/cach[e]/bootsnap* /home/my_user/app/tmp/cache/
 
 # Force creation of tmp and log folders if not exists
 RUN mkdir -p /home/my_user/app/tmp /home/my_user/app/log
