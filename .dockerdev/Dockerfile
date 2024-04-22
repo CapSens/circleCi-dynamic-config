@@ -42,13 +42,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   postgresql-client-$PG_MAJOR
 
 # Install NodeJS and NPM from Nodesource
-ARG NODE_MAJOR=16
-RUN apt-get install -y ca-certificates curl gnupg --no-install-recommends \
-  && mkdir -p /etc/apt/keyrings \
-  && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
-  && apt-get update \
-  && apt-get install nodejs -y --no-install-recommends \
+ARG NODE_MAJOR=21
+RUN echo "Package: nodejs" >> /etc/apt/preferences.d/preferences \
+  && echo "Pin: origin deb.nodesource.com" >> /etc/apt/preferences.d/preferences \
+  && echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/preferences
+
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
   && npm install -g yarn
 
 ARG PACKAGES_TO_INSTALL=""
@@ -179,15 +179,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   && update-locale LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 # Install NodeJS and NPM from Nodesource
-ARG NODE_MAJOR=16
+ARG NODE_MAJOR=21
 ARG FORCE_NODE=""
+RUN echo "Package: nodejs" >> /etc/apt/preferences.d/preferences && \
+    echo "Pin: origin deb.nodesource.com" >> /etc/apt/preferences.d/preferences && \
+    echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/preferences
+
 RUN test -n "$FORCE_NODE" \
-  && apt-get install -y ca-certificates curl gnupg --no-install-recommends \
-  && mkdir -p /etc/apt/keyrings \
-  && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
-  && apt-get update \
-  && apt-get install nodejs -y --no-install-recommends \
+  && curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+  && apt-get install -y --no-install-recommends nodejs \
+  && npm install -g yarn \
   || echo "nodejs not mandatory for production environment"
 
 ARG PACKAGES_TO_INSTALL=""
