@@ -299,7 +299,7 @@ jobs:
       - run:
           name: Build application Docker image
           command: |
-            docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}" \
+            docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}" \
               --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
               --build-arg RAILS_ENV=<< pipeline.parameters.rails-env >> \
               --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
@@ -322,7 +322,7 @@ jobs:
             else
               echo "ready to copy assets for env ${current_env} on assets bucket ${bucket}"
 
-              id=$(docker create ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1})
+              id=$(docker create ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1})
 
               docker cp $id:/home/my_user/app/public/assets public-assets && rm public-assets/manifest.json && \
               aws s3 cp ./public-assets s3://${bucket}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
@@ -340,7 +340,7 @@ jobs:
           command: |
             rm -rf ~/.aws
             aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
-            docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:${CIRCLE_BRANCH}-${CIRCLE_SHA1}
+            docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}
 
   deploy:
     working_directory: ~/<< pipeline.parameters.project-name >>
