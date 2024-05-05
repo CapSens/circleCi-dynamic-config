@@ -119,7 +119,7 @@ commands: # a reusable command with parameters
             - run:
                 name: Additional packages
                 command: |
-                  apt update && apt-get install -y << pipeline.parameters.packages-for-tests >>
+                  apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
