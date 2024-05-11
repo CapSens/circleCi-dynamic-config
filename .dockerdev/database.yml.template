@@ -1,6 +1,6 @@
 default: &default
   adapter: <%= ENV.fetch("DB_ADAPTER", "postgresql") %>
-  encoding: unicode
+  encoding: <%= ENV.fetch("DB_ENCODING", "unicode") %>
   timeout: 5000
   min_messages: warning
   username: <%= ENV.fetch("DB_USERNAME", "postgres") %>
