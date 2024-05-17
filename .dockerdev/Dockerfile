@@ -237,7 +237,8 @@ ENV RAILS_ENV=$RAILS_ENV \
   PATH="/home/my_user/app/bin:${PATH}" \
   LANG=C.UTF-8 \
   LC_ALL=C.UTF-8 \
-  LD_PRELOAD=libjemalloc.so.2
+  LD_PRELOAD=libjemalloc.so.2 \
+  MALLOC_CONF=narenas:2
 
 EXPOSE 3000
 
