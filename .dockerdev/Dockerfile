@@ -109,6 +109,7 @@ ARG GITHUB_TOKEN
 
 # Then, we re-configure Bundler
 ENV RAILS_ENV=$RAILS_ENV \
+  NODE_ENV=production \
   LANG=C.UTF-8 \
   BUNDLE_JOBS=4 \
   BUNDLE_RETRY=3 \
