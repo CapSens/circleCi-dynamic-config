@@ -262,6 +262,9 @@ jobs:
             fi
             IGNORE="$IGNORE CVE-2023-51763"
             IGNORE="$IGNORE CVE-2023-26141"
+            # Arbitrary Code Execution Vulnerability in Trix Editor included in ActionText
+            # Trix is not used on our platforms
+            IGNORE="$IGNORE CVE-2024-34341"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
