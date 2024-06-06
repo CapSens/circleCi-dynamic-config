@@ -185,8 +185,10 @@ jobs:
             if [ $SHRINE_CHECK -eq 0 ]; then
               IGNORE="$IGNORE CVE-2020-15237"
             fi
-            IGNORE="$IGNORE CVE-2023-51763"
             IGNORE="$IGNORE CVE-2024-26143"
+            # Skip CVEs for applications using ActiveAdmin < 3.2.0
+            IGNORE="$IGNORE CVE-2023-51763"
+            IGNORE="$IGNORE CVE-2024-37031"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
