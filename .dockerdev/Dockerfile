@@ -3,7 +3,7 @@
 ARG RUBY_VERSION
 ARG DISTRO_NAME=bullseye
 
-FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME as base
+FROM ruby:$RUBY_VERSION-slim-$DISTRO_NAME AS base
 SHELL ["/bin/bash", "-c"]
 
 RUN echo "IRB.conf[:HISTORY_FILE] = ENV['IRB_HISTFILE']" >> ~/.irbrc
@@ -95,7 +95,7 @@ CMD ["/usr/bin/bash"]
 ##################
 
 # The production-builder image is responsible for installing dependencies and compiling assets
-FROM base as production-builder
+FROM base AS production-builder
 
 # First, we create and configure a dedicated user to run our application
 RUN groupadd --gid 1005 my_user \
@@ -256,15 +256,18 @@ COPY --chown=my_user:my_user .dockerdev/letter_opener_config.rb /home/my_user/ap
 
 # Copy artifacts
 # 1) Installed gems
-COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
+COPY --chown=my_user:my_user --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
 # 1bis) Gemfile.lock updated with platform x86_64-linux
-COPY --from=production-builder /home/my_user/app/Gemfile* /home/my_user/app/
+COPY --chown=my_user:my_user --from=production-builder /home/my_user/app/Gemfile* /home/my_user/app/
 # 2) Compiled assets
 COPY --from=production-builder /home/my_user/app/public/asset[s]/ /home/my_user/app/public/assets
 # pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
 COPY --from=production-builder /home/my_user/app/public/pack[s]/ /home/my_user/app/public/packs
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
 COPY --chown=my_user:my_user --from=production-builder /home/my_user/app/tmp/cach[e]/bootsnap* /home/my_user/app/tmp/cache/
+
+# Install bundler version used in Gemfile.lock
+RUN gem install bundler -v "$(grep -A 1 'BUNDLED WITH' Gemfile.lock | tail -n 1)"
 
 # Force creation of tmp and log folders if not exists
 RUN mkdir -p /home/my_user/app/tmp /home/my_user/app/log
