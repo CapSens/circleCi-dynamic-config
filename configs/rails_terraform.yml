@@ -103,14 +103,14 @@ commands: # a reusable command with parameters
               gem install bundler
             fi
       - restore_cache:
-         key: my-app-{{ checksum "Gemfile.lock" }}
+         key: my-app-{{ checksum "Gemfile.lock" }}-1
       - run:
           name: Bundle install
           command: |
             bundle config set --local path 'vendor/bundle'
             bundle install
       - save_cache:
-          key: my-app-{{ checksum "Gemfile.lock" }}
+          key: my-app-{{ checksum "Gemfile.lock" }}-1
           paths:
               - vendor/bundle
       - when:
