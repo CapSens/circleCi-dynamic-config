@@ -144,7 +144,7 @@ commands: # a reusable command with parameters
             cd terraform_infra
             mkdir -p live/rails_application
             tfvars_file="live/rails_application/tfvars/<< pipeline.parameters.workspace >>.tfvars"
-            aws s3 cp s3://capsens-terraform-tfvars/<< pipeline.parameters.tfvars >> $tfvars_file
+            aws s3 cp s3://${TFVARS_BUCKET:-capsens-terraform-tfvars}/<< pipeline.parameters.tfvars >> $tfvars_file
 
       - run:
           name: Assume admin role for k8s cluster
