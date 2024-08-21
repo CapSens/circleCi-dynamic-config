@@ -61,9 +61,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
 
 ARG PIP_PACKAGES=""
+# add  --break-system-packages option to pip install to use it in a virtual env
 RUN if test -n "$PIP_PACKAGES" ; \
   then \
-    pip install --no-cache-dir --break-system-packages $PIP_PACKAGES ; \
+    pip install --no-cache-dir $PIP_PACKAGES ; \
   fi ;
 
 # Configure bundler
@@ -209,9 +210,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
 
 ARG PIP_PACKAGES=""
+# add  --break-system-packages option to pip install to use it in a virtual env
 RUN if test -n "$PIP_PACKAGES" ; \
   then \
-    pip install --no-cache-dir --break-system-packages $PIP_PACKAGES ; \
+    pip install --no-cache-dir $PIP_PACKAGES ; \
   fi ;
 
 # add policy to allow convert images to PDF with imagemagick if it's installed
