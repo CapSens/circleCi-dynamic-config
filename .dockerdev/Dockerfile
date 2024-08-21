@@ -60,6 +60,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
   $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
 
+ARG PIP_PACKAGES=""
+RUN if test -n "$PIP_PACKAGES" ; \
+  then \
+    pip install --no-cache-dir --break-system-packages $PIP_PACKAGES ; \
+  fi ;
+
 # Configure bundler
 ENV LANG=C.UTF-8 \
   BUNDLE_JOBS=4 \
@@ -201,6 +207,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   apt-get update -qq && \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
   $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
+
+ARG PIP_PACKAGES=""
+RUN if test -n "$PIP_PACKAGES" ; \
+  then \
+    pip install --no-cache-dir --break-system-packages $PIP_PACKAGES ; \
+  fi ;
 
 # add policy to allow convert images to PDF with imagemagick if it's installed
 RUN if command -v convert &> /dev/null; \

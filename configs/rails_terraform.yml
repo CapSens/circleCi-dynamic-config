@@ -54,6 +54,10 @@ parameters:
   packages-for-tests:
     type: string
     default: ""
+  pip-packages:
+    description: "space separated list of pip packages to install (usefull for apps using pycall - ifu_generator)"
+    type: string
+    default: ""
   tests-parallelism:
     type: integer
     default: 1
@@ -120,6 +124,13 @@ commands: # a reusable command with parameters
                 name: Additional packages
                 command: |
                   apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
+      - when:
+          condition: << pipeline.parameters.pip-packages >>
+          steps:
+            - run:
+                name: Additional pip packages
+                command: |
+                  pip install --no-cache-dir --break-system-packages << pipeline.parameters.pip-packages >>
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
@@ -312,6 +323,7 @@ jobs:
               --build-arg NODE_MAJOR=<< pipeline.parameters.node-version >> \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
               --build-arg PACKAGES_TO_INSTALL="<< pipeline.parameters.packages-to-install >>" \
+              --build-arg PIP_PACKAGES="<< pipeline.parameters.pip-packages >>" \
               --file .dockerdev/Dockerfile \
               .
       - run:
