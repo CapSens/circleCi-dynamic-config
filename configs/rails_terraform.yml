@@ -130,7 +130,7 @@ commands: # a reusable command with parameters
             - run:
                 name: Additional pip packages
                 command: |
-                  pip install --no-cache-dir --break-system-packages << pipeline.parameters.pip-packages >>
+                  pip install << pipeline.parameters.pip-packages >>
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
