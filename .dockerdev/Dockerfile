@@ -61,10 +61,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
 
 ARG PIP_PACKAGES=""
-# add  --break-system-packages option to pip install to use it in a virtual env
 RUN if test -n "$PIP_PACKAGES" ; \
   then \
-    pip install --no-cache-dir $PIP_PACKAGES ; \
+    # create symlink to python3 and pip3 if not exists
+    ln -s /usr/bin/python3 /usr/bin/python && (ln -s /usr/bin/pip3 /usr/bin/pip || echo "file exist") \
+    # add  --break-system-packages option to pip install to use it in a virtual env
+    && pip install --no-cache-dir $PIP_PACKAGES; \
   fi ;
 
 # Configure bundler
@@ -210,10 +212,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   $(echo $(grep -Ev '^\s*#' /tmp/Aptfile | xargs) $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs)
 
 ARG PIP_PACKAGES=""
-# add  --break-system-packages option to pip install to use it in a virtual env
 RUN if test -n "$PIP_PACKAGES" ; \
   then \
-    pip install --no-cache-dir $PIP_PACKAGES ; \
+    # create symlink to python3 and pip3 if not exists
+    ln -s /usr/bin/python3 /usr/bin/python && (ln -s /usr/bin/pip3 /usr/bin/pip || echo "file exist") \
+    # add  --break-system-packages option to pip install to use it in a virtual env
+    && pip install --no-cache-dir $PIP_PACKAGES; \
   fi ;
 
 # add policy to allow convert images to PDF with imagemagick if it's installed
