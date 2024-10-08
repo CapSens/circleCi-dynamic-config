@@ -368,13 +368,6 @@ jobs:
     steps:
       - setup_terraform
       - run:
-          name: Terraform deploy
-          command: |
-            cd terraform_infra
-            make init project=rails_application
-            make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
-            make apply project=rails_application workspace=<< pipeline.parameters.workspace >> extra_args=-auto-approve
-      - run:
           name: Log deployment
           command: |
             while true; do
@@ -386,6 +379,13 @@ jobs:
               sleep 5
             done
           background: true
+      - run:
+          name: Terraform deploy
+          command: |
+            cd terraform_infra
+            make init project=rails_application
+            make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
+            make apply project=rails_application workspace=<< pipeline.parameters.workspace >> extra_args=-auto-approve
 
 
   undeploy:
