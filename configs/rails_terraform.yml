@@ -368,24 +368,29 @@ jobs:
     steps:
       - setup_terraform
       - run:
-          name: Log deployment
-          command: |
-            while true; do
-              kubectl logs \
-                -n app-<< pipeline.parameters.workspace >> \
-                -l app.kubernetes.io/version=<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1} \
-                -f \
-                --all-containers
-              sleep 5
-            done
-          background: true
-      - run:
           name: Terraform deploy
           command: |
             cd terraform_infra
             make init project=rails_application
             make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
             make apply project=rails_application workspace=<< pipeline.parameters.workspace >> extra_args=-auto-approve
+      - run:
+          name: Failure Logs
+          command: |
+            echo "### DESCRIBE PODS for verions << pipeline.parameters.rails-env >>-${CIRCLE_SHA1} ###"
+            kubectl describe pods \
+              -n app-<< pipeline.parameters.workspace >> \
+              -l app.kubernetes.io/version=<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}
+            echo "### END DESCRIBE PODS ###"
+
+            echo "### CONTAINERS STDOUT ###"
+            kubectl logs \
+              -n app-<< pipeline.parameters.workspace >> \
+              -l app.kubernetes.io/version=<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1} \
+              --tail 100 \
+              --all-containers
+            echo "### END CONTAINERS STDOUT ###"
+          when: on_fail
 
 
   undeploy:
