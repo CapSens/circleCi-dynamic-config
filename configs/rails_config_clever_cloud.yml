@@ -180,6 +180,8 @@ jobs:
             # Skip CVEs for applications using ActiveAdmin < 3.2.0
             IGNORE="$IGNORE CVE-2023-51763"
             IGNORE="$IGNORE CVE-2024-37031"
+            # Skip CVE on ActionPack < 7.0 about dynamically set CSP headers
+            IGNORE="$IGNORE CVE-2024-54133"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
