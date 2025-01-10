@@ -12,17 +12,6 @@ It runs RSpec, handles the assets (Webpacker and Sprockets), and much more.
     * The `project-name` config file parameter must match the `username` and `database` variables of the CI database file.
 6. Don't forget to activate your project (if necessary) on CircleCI (https://app.circleci.com/projects/project-dashboard/github/CapSens/ => "Set up Project")
 
-## Rails applications with per-environment encrypted credentials
-
-When using the dynamic config in a Rails application that has per-environment encrypted credentials, the `configs/rails_config_with_per_env_credentials.yml` file must be used.
-
-This config file requires two environment variables:
-
-- `RAILS_MASTER_KEY_STAGING`: This is the `RAILS_MASTER_KEY` for the encrypted credentials of the staging environment
-- `RAILS_MASTER_KEY_PRODUCTION`: This is the `RAILS_MASTER_KEY` for the encrypted credentials of the production environment
-
-To use this config, copy the file `config_with_per_env_credentials.yml.example` to your project's `.circleci/config.yml`.
-
 ## Tests parallelism
 
 You can enable the tests parallelism by providing the `tests-parallelism` variable with a value greater than 1.
