@@ -458,7 +458,10 @@ workflows:
             context:
               - COMMON
         - save_and_restore_caches
-        - spec
+        - spec:
+            requires:
+              - save_and_restore_caches
+
         - security_check
 
   build-and-deploy:
