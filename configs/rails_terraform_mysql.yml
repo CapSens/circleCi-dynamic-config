@@ -54,6 +54,10 @@ parameters:
   packages-for-tests:
     type: string
     default: ""
+  pip-packages:
+    description: "space separated list of pip packages to install (usefull for apps using pycall - ifu_generator)"
+    type: string
+    default: ""
   tests-parallelism:
     type: integer
     default: 1
@@ -102,27 +106,6 @@ commands: # a reusable command with parameters
             else
               gem install bundler
             fi
-      - restore_cache:
-         key: my-app-{{ checksum "Gemfile.lock" }}
-      - run:
-          name: Bundle install
-          command: |
-            bundle config set --local path 'vendor/bundle'
-            bundle install
-      - save_cache:
-          key: my-app-{{ checksum "Gemfile.lock" }}
-          paths:
-              - vendor/bundle
-      - when:
-          condition: << pipeline.parameters.packages-for-tests >>
-          steps:
-            - run:
-                name: Additional packages
-                command: |
-                  apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
-      - run:
-          name: Database initialization
-          command: bundle exec rake db:create db:migrate
 
   setup_terraform:
     steps:
@@ -144,14 +127,14 @@ commands: # a reusable command with parameters
             cd terraform_infra
             mkdir -p live/rails_application
             tfvars_file="live/rails_application/tfvars/<< pipeline.parameters.workspace >>.tfvars"
-            aws s3 cp s3://capsens-terraform-tfvars/<< pipeline.parameters.tfvars >> $tfvars_file
+            aws s3 cp s3://${TFVARS_BUCKET:-capsens-terraform-tfvars}/<< pipeline.parameters.tfvars >> $tfvars_file
 
       - run:
           name: Assume admin role for k8s cluster
           command: |
             aws --profile default configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
             aws --profile default configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
-            aws --profile default configure set default.region eu-west-1
+            aws --profile default configure set default.region ${DEPLOY_AWS_REGION:-eu-west-1}
 
             cat \<<- EOF >> ~/.aws/config
             [profile deployer]
@@ -202,6 +185,48 @@ jobs:
               else
                 echo "Nothing to cancel"
             fi
+
+  save_and_restore_caches:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+    steps:
+      - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - save_cache:
+          name: "save bundler cache"
+          key: my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - vendor/bundle
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Yarn install
+          command: |
+            yarn install || true
+      - save_cache:
+          name: "save yarn cache"
+          key: my-app-yarn-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - node_modules
+
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.resource-class >>
@@ -229,12 +254,45 @@ jobs:
     parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - when:
+          condition: << pipeline.parameters.packages-for-tests >>
+          steps:
+            - run:
+                name: Additional packages
+                command: |
+                  apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
+      - when:
+          condition: << pipeline.parameters.pip-packages >>
+          steps:
+            - run:
+                name: Additional pip packages
+                command: |
+                  pip install << pipeline.parameters.pip-packages >>
+      - run:
+          name: Database initialization
+          command: bundle exec rake db:create db:migrate
       - run:
           name: Test
           command: |
             yarn
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run)
+
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
@@ -261,6 +319,9 @@ jobs:
               IGNORE="$IGNORE CVE-2020-15237"
             fi
             IGNORE="$IGNORE CVE-2023-26141"
+            # Arbitrary Code Execution Vulnerability in Trix Editor included in ActionText
+            # Trix is not used on our platforms
+            IGNORE="$IGNORE CVE-2024-34341"
             # Skip CVEs for applications using ActiveAdmin < 3.2.0
             IGNORE="$IGNORE CVE-2023-51763"
             IGNORE="$IGNORE CVE-2024-37031"
@@ -282,8 +343,6 @@ jobs:
 
   build:
     working_directory: /tmp/app
-    environment:
-      DOCKER_REGISTRY: 396522184519.dkr.ecr.eu-west-1.amazonaws.com
     docker:
       - image: cimg/aws:2023.09
     steps:
@@ -303,6 +362,7 @@ jobs:
       - run:
           name: Build application Docker image
           command: |
+            DOCKER_REGISTRY=396522184519.dkr.ecr.${DEPLOY_AWS_REGION:-eu-west-1}.amazonaws.com
             docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}" \
               --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
               --build-arg RAILS_ENV=<< pipeline.parameters.rails-env >> \
@@ -312,11 +372,13 @@ jobs:
               --build-arg NODE_MAJOR=<< pipeline.parameters.node-version >> \
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
               --build-arg PACKAGES_TO_INSTALL="<< pipeline.parameters.packages-to-install >>" \
+              --build-arg PIP_PACKAGES="<< pipeline.parameters.pip-packages >>" \
               --file .dockerdev/Dockerfile \
               .
       - run:
           name: Extract assets from container and push to s3
           command: |
+            DOCKER_REGISTRY=396522184519.dkr.ecr.${DEPLOY_AWS_REGION:-eu-west-1}.amazonaws.com
             current_env=<< pipeline.parameters.rails-env >>
             bucket=<< pipeline.parameters.assets-bucket >>
 
@@ -342,8 +404,10 @@ jobs:
       - run:
           name: Push application Docker image
           command: |
+            DOCKER_REGISTRY=396522184519.dkr.ecr.${DEPLOY_AWS_REGION:-eu-west-1}.amazonaws.com
+
             rm -rf ~/.aws
-            aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
+            aws ecr get-login-password --region ${DEPLOY_AWS_REGION:-eu-west-1} | docker login --username AWS --password-stdin ${DOCKER_REGISTRY}
             docker push ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}
 
   deploy:
@@ -359,6 +423,24 @@ jobs:
             make init project=rails_application
             make new project=rails_application workspace=<< pipeline.parameters.workspace >> 2>/dev/null || true
             make apply project=rails_application workspace=<< pipeline.parameters.workspace >> extra_args=-auto-approve
+      - run:
+          name: Failure Logs
+          command: |
+            echo "### DESCRIBE PODS for verions << pipeline.parameters.rails-env >>-${CIRCLE_SHA1} ###"
+            kubectl describe pods \
+              -n app-<< pipeline.parameters.workspace >> \
+              -l app.kubernetes.io/version=<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}
+            echo "### END DESCRIBE PODS ###"
+
+            echo "### CONTAINERS STDOUT ###"
+            kubectl logs \
+              -n app-<< pipeline.parameters.workspace >> \
+              -l app.kubernetes.io/version=<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1} \
+              --tail 100 \
+              --all-containers
+            echo "### END CONTAINERS STDOUT ###"
+          when: on_fail
+
 
   undeploy:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -385,7 +467,11 @@ workflows:
         - auto_cancel_redundant_workflows:
             context:
               - COMMON
-        - spec
+        - save_and_restore_caches
+        - spec:
+            requires:
+              - save_and_restore_caches
+
         - security_check
 
   build-and-deploy:
