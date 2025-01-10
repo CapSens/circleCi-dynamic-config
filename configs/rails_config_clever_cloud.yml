@@ -19,12 +19,9 @@ parameters:
   ignored_cves:
     type: string
     default: ""
-  install-redis:
-    type: boolean
-    default: false
-  install-tesseract:
-    type: boolean
-    default: false
+  packages-for-tests:
+    type: string
+    default: ""
   tests-parallelism:
     type: integer
     default: 1
@@ -54,36 +51,92 @@ commands: # a reusable command with parameters
       - run:
           name: Install Bundler
           # mettre ici la meme version que celle utilisée pour générer le gemfile.lock sinon le cache ne marchera pas
-          command: gem install bundler:<< pipeline.parameters.bundler-version >>
-      - restore_cache:
-         key: my-app-{{ checksum "Gemfile.lock" }}
-      - run:
-          name: Bundle install
-          command: bundle install --path vendor/bundle
-      - save_cache:
-          key: my-app-{{ checksum "Gemfile.lock" }}
-          paths:
-              - vendor/bundle
-      - when:
-          condition: << pipeline.parameters.install-redis >>
-          steps:
-            - run:
-                name: Redis
-                command: |
-                  apt-get install -y redis-server
-                  service redis-server start
-      - when:
-          condition: << pipeline.parameters.install-tesseract >>
-          steps:
-            - run:
-                name: Tesseract OCR
-                command: |
-                  apt-get install -y tesseract-ocr
-      - run:
-          name: Database initialization
-          command: bundle exec rake db:create db:migrate
+          command: |
+            if [ -n "<< pipeline.parameters.bundler-version >>" ]; then
+              gem install bundler:<< pipeline.parameters.bundler-version >>
+            else
+              gem install bundler
+            fi
 
 jobs:
+  auto_cancel_redundant_workflows:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - run:
+          name: "cancel_redundant_workflows"
+          command: |
+            ## Get the name of the workflow and the related pipeline number
+            curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}" -o current_workflow.json
+            WF_NAME=$(jq -r '.name' current_workflow.json)
+            CURRENT_PIPELINE_NUM=$(jq -r '.pipeline_number' current_workflow.json)
+
+            ## Get the IDs of pipelines created by the current user on the same branch. (Only consider pipelines that have a pipeline number inferior to the current pipeline)
+            PIPE_IDS=$(curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=$CIRCLE_BRANCH"|jq -r --arg CIRCLE_USERNAME "$CIRCLE_USERNAME" --argjson CURRENT_PIPELINE_NUM "$CURRENT_PIPELINE_NUM" '.items[]|select(.state == "created")|select(.trigger.actor.login == $CIRCLE_USERNAME)|select(.number < $CURRENT_PIPELINE_NUM)|.id')
+
+            ## Get the IDs of currently running/on_hold workflows that have the same name as the current workflow, in all previously created pipelines.
+            if [ ! -z "$PIPE_IDS" ]; then
+              for PIPE_ID in $PIPE_IDS
+              do
+                curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/pipeline/${PIPE_ID}/workflow"|jq -r --arg WF_NAME "${WF_NAME}" '.items[]|select(.status == "on_hold" or .status == "running") | select(.name == $WF_NAME) | .id' >> WF_to_cancel.txt
+              done
+            fi
+
+            ## Cancel any currently running/on_hold workflow with the same name
+            if [ -s WF_to_cancel.txt ]; then
+              echo "Cancelling the following workflow(s):"
+              cat WF_to_cancel.txt
+              while read WF_ID;
+                do
+                  curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request POST https://circleci.com/api/v2/workflow/$WF_ID/cancel
+                done < WF_to_cancel.txt
+              ## Allowing some time to complete the cancellation
+              sleep 2
+              else
+                echo "Nothing to cancel"
+            fi
+
+  save_and_restore_caches:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+    steps:
+      - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - save_cache:
+          name: "save bundler cache"
+          key: my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - vendor/bundle
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Yarn install
+          command: |
+            yarn install || true
+      - save_cache:
+          name: "save yarn cache"
+          key: my-app-yarn-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - node_modules
+
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.resource-class >>
@@ -100,15 +153,49 @@ jobs:
           POSTGRES_DB: << pipeline.parameters.project-name >>
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
+      - image: docker.elastic.co/elasticsearch/elasticsearch:6.7.0
+        environment:
+          - cluster.name: elasticsearch
+          - xpack.security.enabled: false
+          - transport.host: localhost
+          - network.host: 127.0.0.1
+          - http.port: 9200
+          - discovery.type: single-node
     parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - when:
+          condition: << pipeline.parameters.packages-for-tests >>
+          steps:
+            - run:
+                name: Additional packages
+                command: |
+                  apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
+      - run:
+          name: Database initialization
+          command: bundle exec rake db:create db:migrate
       - run:
           name: Test
           command: |
             yarn
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run)
+
   assets:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.assets-resource-class >>
@@ -235,9 +322,17 @@ jobs:
 
 workflows:
     version: 2
-    'workflow':
+
+    workflow:
         jobs:
-            - spec
+            - auto_cancel_redundant_workflows:
+                context:
+                  - COMMON
+            - save_and_restore_caches
+            - spec:
+                requires:
+                  - save_and_restore_caches
+
             - security_check
             - assets:
                 context:
@@ -245,7 +340,10 @@ workflows:
                 filters:
                   branches:
                     only: [master, staging]
-                requires: ['spec', 'security_check']
+                requires:
+                  - spec
+                  - security_check
+
             - clever_cloud_deploy:
                 context: CLEVER_CLOUD
                 filters:

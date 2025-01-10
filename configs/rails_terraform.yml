@@ -106,34 +106,6 @@ commands: # a reusable command with parameters
             else
               gem install bundler
             fi
-      - restore_cache:
-         key: my-app-{{ checksum "Gemfile.lock" }}-1
-      - run:
-          name: Bundle install
-          command: |
-            bundle config set --local path 'vendor/bundle'
-            bundle install
-      - save_cache:
-          key: my-app-{{ checksum "Gemfile.lock" }}-1
-          paths:
-              - vendor/bundle
-      - when:
-          condition: << pipeline.parameters.packages-for-tests >>
-          steps:
-            - run:
-                name: Additional packages
-                command: |
-                  apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
-      - when:
-          condition: << pipeline.parameters.pip-packages >>
-          steps:
-            - run:
-                name: Additional pip packages
-                command: |
-                  pip install << pipeline.parameters.pip-packages >>
-      - run:
-          name: Database initialization
-          command: bundle exec rake db:create db:migrate
 
   setup_terraform:
     steps:
@@ -213,6 +185,48 @@ jobs:
               else
                 echo "Nothing to cancel"
             fi
+
+  save_and_restore_caches:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+    steps:
+      - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - save_cache:
+          name: "save bundler cache"
+          key: my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - vendor/bundle
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Yarn install
+          command: |
+            yarn install || true
+      - save_cache:
+          name: "save yarn cache"
+          key: my-app-yarn-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - node_modules
+
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.resource-class >>
@@ -240,12 +254,45 @@ jobs:
     parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - when:
+          condition: << pipeline.parameters.packages-for-tests >>
+          steps:
+            - run:
+                name: Additional packages
+                command: |
+                  apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
+      - when:
+          condition: << pipeline.parameters.pip-packages >>
+          steps:
+            - run:
+                name: Additional pip packages
+                command: |
+                  pip install << pipeline.parameters.pip-packages >>
+      - run:
+          name: Database initialization
+          command: bundle exec rake db:create db:migrate
       - run:
           name: Test
           command: |
             yarn
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run)
+
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
@@ -420,7 +467,11 @@ workflows:
         - auto_cancel_redundant_workflows:
             context:
               - COMMON
-        - spec
+        - save_and_restore_caches
+        - spec:
+            requires:
+              - save_and_restore_caches
+
         - security_check
 
   build-and-deploy:
