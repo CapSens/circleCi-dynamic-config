@@ -213,6 +213,21 @@ jobs:
           POSTGRES_HOST_AUTH_METHOD: trust
     steps:
       - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
       - run:
           name: "Compile and serve assets"
           command: |
