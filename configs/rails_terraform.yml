@@ -190,7 +190,7 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.resource-class >>
     docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>-node
         environment:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
@@ -231,13 +231,13 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.resource-class >>
     docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>-slim
         environment:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
       - image: cimg/redis:6.2.6
-      - image: postgres:12
+      - image: cimg/postgres:16.6
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
           POSTGRES_DB: << pipeline.parameters.project-name >>
@@ -297,7 +297,7 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
     docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>
         environment:
           RAILS_ENV: test
     steps:
