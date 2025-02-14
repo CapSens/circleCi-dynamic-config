@@ -190,7 +190,7 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: << pipeline.parameters.resource-class >>
     docker:
-      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>-node
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>-slim
         environment:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
@@ -236,8 +236,8 @@ jobs:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
-      - image: cimg/redis:6.2.6
-      - image: cimg/postgres:16.6
+      - image: redis:6.2-alpine
+      - image: postgres:16-alpine
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
           POSTGRES_DB: << pipeline.parameters.project-name >>
