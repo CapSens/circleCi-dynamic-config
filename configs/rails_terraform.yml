@@ -363,7 +363,7 @@ jobs:
           name: Build application Docker image
           command: |
             DOCKER_REGISTRY=396522184519.dkr.ecr.${DEPLOY_AWS_REGION:-eu-west-1}.amazonaws.com
-            docker build -t "${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}" \
+            docker build --progress=plain -t "${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1}" \
               --build-arg DISTRO_NAME=<< pipeline.parameters.ruby-docker-distro >> \
               --build-arg RAILS_ENV=<< pipeline.parameters.rails-env >> \
               --build-arg RUBY_VERSION=<< pipeline.parameters.ruby-version >> \
