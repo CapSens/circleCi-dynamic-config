@@ -125,7 +125,7 @@ ARG DB_ADAPTER=postgresql
 ENV DB_NAME=fake_database_name
 ENV DB_ADAPTER=$DB_ADAPTER
 # Copy database config to avoid human errors
-COPY --chown=my_user:my_user .dockerdev/database.yml.template /home/my_user/app/config/database.yml
+COPY .dockerdev/database.yml.template config/database.yml
 
 # Install JS packages
 RUN yarn install --check-files
