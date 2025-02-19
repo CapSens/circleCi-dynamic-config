@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7-labs
 
 ARG RUBY_VERSION
 ARG DISTRO_NAME=bullseye
@@ -36,15 +36,6 @@ RUN if test -n "$PIP_PACKAGES" ; \
     && pip install --no-cache-dir $PIP_PACKAGES; \
   fi ;
 
-# Upgrade RubyGems if possible
-RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
-  then \
-    gem update --system --no-document; \
-  elif echo -e "2.7\n$RUBY_VERSION" | sort -V -C ; \
-  then \
-    gem update --system 3.4.22 --no-document; \
-  fi ;
-
 ARG RAILS_ENV
 # Ruby/Rails env configuration
 ENV RAILS_ENV=$RAILS_ENV \
@@ -58,6 +49,15 @@ ENV RAILS_ENV=$RAILS_ENV \
   LD_PRELOAD=libjemalloc.so.2 \
   MALLOC_CONF=narenas:2 \
   BUNDLE_WITHOUT="development test"
+
+# Upgrade RubyGems if possible
+RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
+  then \
+    gem update --system --no-document; \
+  elif echo -e "2.7\n$RUBY_VERSION" | sort -V -C ; \
+  then \
+    gem update --system 3.4.22 --no-document; \
+  fi ;
 
 FROM base AS production-builder
 
@@ -104,7 +104,7 @@ RUN gem install bundler -v "$(grep -A 1 'BUNDLED WITH' Gemfile.lock | tail -n 1)
 
 RUN mkdir -p $BUNDLE_PATH \
   && sed -i 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
-  # && sed -i '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "master"/' Gemfile \
+  && sed -i '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "master"/' Gemfile \
   && bundle lock \
   && bundle config --local path "${BUNDLE_PATH}" \
   && bundle config set clean "true" \
@@ -116,7 +116,7 @@ RUN mkdir -p $BUNDLE_PATH \
   && bundle exec bootsnap precompile --gemfile
 
 # Copy application code
-COPY . .
+COPY --exclude=Gemfile* . .
 
 #Precompile bootsnap code for faster boot times
 RUN bundle exec bootsnap precompile app/ lib/
@@ -171,8 +171,8 @@ RUN if command -v convert &> /dev/null; \
     echo "imagemagick not mandatory for production environment"; \
   fi
 
-# Copy code
-COPY . .
+# Copy application code
+COPY --exclude=Gemfile* . .
 
 # Configure Rails to allow public file server served by app server
 RUN sed -i 's/\(.*public_file_server\.enabled.*= \).*/\1true/' config/environments/${RAILS_ENV}.rb
@@ -186,13 +186,13 @@ COPY .dockerdev/letter_opener_config.rb /home/my_user/app/config/initializers/le
 # 1) Installed gems
 COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
 # 1bis) Gemfile.lock updated with platform x86_64-linux
-COPY --from=production-builder /rails/Gemfile* /home/my_user/app/
+COPY --from=production-builder /rails/Gemfile* ./
 # 2) Compiled assets
-COPY --from=production-builder /rails/public/asset[s]/ /home/my_user/app/public/assets
+COPY --from=production-builder /rails/public/asset[s]/ ./public/assets
 # pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
-COPY --from=production-builder /rails/public/pack[s]/ /home/my_user/app/public/packs
+COPY --from=production-builder /rails/public/pack[s]/ ./public/packs
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
-COPY --from=production-builder /rails/tmp/cach[e]/bootsnap* /home/my_user/app/tmp/cache/
+COPY --from=production-builder /rails/tmp/cach[e]/bootsnap* ./tmp/cache/
 
 # Install bundler version used in Gemfile.lock
 RUN gem install bundler -v "$(grep -A 1 'BUNDLED WITH' Gemfile.lock | tail -n 1)"
