@@ -18,11 +18,7 @@ jobs:
             {
               "project-name": "myapp",
               "ruby-version": "2.6.6",
-              "bundler-version": "2.2.2",
-              "assets-bucket-staging": "myapp-staging-assets",
-              "assets-bucket-production": "myapp-production-assets",
-              "install-redis": false,
-              "install-tesseract": false
+              "bundler-version": "2.2.2"
             }
           configuration_path: dynamic_configs/configs/rails_terraform.yml
 
