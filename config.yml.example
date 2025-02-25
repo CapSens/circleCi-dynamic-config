@@ -24,7 +24,7 @@ jobs:
               "install-redis": false,
               "install-tesseract": false
             }
-          configuration_path: dynamic_configs/configs/rails_config.yml
+          configuration_path: dynamic_configs/configs/rails_terraform.yml
 
 workflows:
   setup-workflow:
