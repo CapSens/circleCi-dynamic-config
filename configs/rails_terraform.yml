@@ -236,8 +236,8 @@ jobs:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
-      - image: cimg/redis:6.2.6
-      - image: postgres:12
+      - image: redis:6.2-alpine
+      - image: postgres:16-alpine
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
           POSTGRES_DB: << pipeline.parameters.project-name >>
@@ -297,7 +297,7 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
     docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>
         environment:
           RAILS_ENV: test
     steps:
@@ -414,6 +414,7 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
       - image: cimg/aws:2023.09
+    resource_class: small
     steps:
       - setup_terraform
       - run:
@@ -446,6 +447,7 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
       - image: cimg/aws:2023.09
+    resource_class: small
     steps:
       - setup_terraform
       - run:
