@@ -23,6 +23,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   libjemalloc2 \
   shared-mime-info \
   libpq5 \
+  curl \
   file \
   $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs) \
   && rm -rf /var/lib/apt/lists/*
@@ -75,7 +76,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
   build-essential \
   git \
-  wget \
   libpq-dev \
   && rm -rf /var/lib/apt/lists/*
 
@@ -84,7 +84,7 @@ ARG NODE_MAJOR=21
 RUN echo "Package: nodejs" >> /etc/apt/preferences.d/preferences \
   && echo "Pin: origin deb.nodesource.com" >> /etc/apt/preferences.d/preferences \
   && echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/preferences \
-  && wget -qO- https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+  && curl -sSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g yarn
@@ -154,7 +154,7 @@ RUN test -n "$FORCE_NODE" \
   && echo "Package: nodejs" >> /etc/apt/preferences.d/preferences \
   && echo "Pin: origin deb.nodesource.com" >> /etc/apt/preferences.d/preferences \
   && echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/preferences \
-  && wget -qO- https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+  && curl -sSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g yarn \
