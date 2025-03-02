@@ -112,14 +112,10 @@ RUN mkdir -p $BUNDLE_PATH \
   && bundle config --local without "development:test" \
   && bundle lock --add-platform x86_64-linux \
   && bundle install --jobs=${BUNDLE_JOBS} \
-  && rm -rf $BUNDLE_PATH/.bundle $BUNDLE_PATH/ruby/*/cache/* $BUNDLE_PATH/ruby/*/bundler/gems/*/.git \
-  && bundle exec bootsnap precompile --gemfile
+  && rm -rf $BUNDLE_PATH/.bundle $BUNDLE_PATH/ruby/*/cache/* $BUNDLE_PATH/ruby/*/bundler/gems/*/.git
 
 # Copy application code
 COPY --exclude=Gemfile* . .
-
-#Precompile bootsnap code for faster boot times
-RUN bundle exec bootsnap precompile app/ lib/
 
 ARG DB_ADAPTER=postgresql
 ENV DB_NAME=fake_database_name
