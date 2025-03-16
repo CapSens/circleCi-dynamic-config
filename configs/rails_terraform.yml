@@ -391,10 +391,10 @@ jobs:
               id=$(docker create ${DOCKER_REGISTRY}/<< pipeline.parameters.ecr-repository >>:<< pipeline.parameters.rails-env >>-${CIRCLE_SHA1})
 
               docker cp $id:/home/my_user/app/public/assets public-assets && rm public-assets/manifest.json && \
-              aws s3 cp ./public-assets s3://${bucket}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+              aws s3 sync ./public-assets s3://${bucket}/assets/ --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
 
               if docker cp $id:/home/my_user/app/public/packs public-packs > /dev/null 2>&1 ; then
-                aws s3 cp ./public-packs s3://${bucket}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+                aws s3 sync ./public-packs s3://${bucket}/packs/ --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
               else
                 echo "No public/packs directory, skipping packs upload."
               fi
