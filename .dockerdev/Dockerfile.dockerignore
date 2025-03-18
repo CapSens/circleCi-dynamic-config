@@ -53,3 +53,7 @@ Gemfile.lock.backup
 
 # Ignore letter_opener config
 config/initializers/letter_opener*.rb
+
+# Ignore env files
+.env*
+config/application.yml

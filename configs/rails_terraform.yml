@@ -47,7 +47,7 @@ parameters:
   node-version:
     description: "version of node to install"
     type: string
-    default: "16"
+    default: "20"
   ignored_cves:
     type: string
     default: ""
