@@ -19,12 +19,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   rm -f /etc/apt/apt.conf.d/docker-clean; \
   apt-get update -qq && \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
-  less \
-  libjemalloc2 \
-  shared-mime-info \
-  libpq5 \
   curl \
+  less \
   file \
+  libjemalloc2 \
+  libpq5 \
+  shared-mime-info \
   $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs) \
   && rm -rf /var/lib/apt/lists/*
 
@@ -75,6 +75,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   build-essential \
   git \
   libpq-dev \
+  libyaml-dev \
+  libssl-dev \
+  libz-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # Install NodeJS and NPM from Nodesource
@@ -96,6 +99,7 @@ ENV RAILS_ENV=$RAILS_ENV \
 
 # Copy code
 COPY Gemfile Gemfile.lock ./
+COPY vendo[r] ./vendor
 
 RUN mkdir -p $BUNDLE_PATH \
   && sed -i 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
@@ -179,11 +183,11 @@ COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
 # 1bis) Gemfile.lock updated with platform x86_64-linux
 COPY --from=production-builder /rails/Gemfile* ./
 # 2) Compiled assets
-COPY --from=production-builder /rails/public/asset[s]/ ./public/assets
+COPY --from=production-builder /rails/publi[c]/asset[s]/ ./public/assets
 # pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
-COPY --from=production-builder /rails/public/pack[s]/ ./public/packs
+COPY --from=production-builder /rails/publi[c]/pack[s]/ ./public/packs
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
-COPY --from=production-builder /rails/tmp/cach[e]/bootsnap* ./tmp/cache/bootsnap
+COPY --from=production-builder /rails/tm[p]/cach[e]/bootsnap* ./tmp/cache/bootsnap
 
 # Force creation of tmp and log folders if not exists
 RUN mkdir -p /home/my_user/app/tmp /home/my_user/app/log
