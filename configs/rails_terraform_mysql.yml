@@ -288,10 +288,19 @@ jobs:
           command: bundle exec rake db:create db:migrate
       - run:
           name: Test
+          no_output_timeout: 15m
           command: |
             yarn
-            circleci tests glob "spec/**/*_spec.rb" | circleci tests split > /tmp/tests-to-run
-            bundle exec rspec $(cat /tmp/tests-to-run)
+            mkdir /tmp/test-results
+            if ! bundle info rspec_junit_formatter > /dev/null 2>&1; then
+              bundle add rspec_junit_formatter
+              bundle install
+            fi
+            circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings > /tmp/tests-to-run
+            bundle exec rspec $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
+
+      - store_test_results:
+          path: /tmp/test-results
 
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
