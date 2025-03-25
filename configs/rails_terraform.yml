@@ -89,6 +89,10 @@ parameters:
     description: "use docker cache. Set to false to force rebuild of all layers in the docker image"
     type: boolean
     default: true
+  pg-image-version:
+    description: "Postgres image version used by CI"
+    type: string
+    default: "16"
 
 commands: # a reusable command with parameters
   setup_env:
@@ -237,7 +241,7 @@ jobs:
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
       - image: redis:6.2-alpine
-      - image: postgres:16-alpine
+      - image: postgres:<< pipeline.parameters.pg-image-version >>-alpine
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
           POSTGRES_DB: << pipeline.parameters.project-name >>
