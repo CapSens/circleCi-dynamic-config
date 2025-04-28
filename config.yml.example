@@ -1,6 +1,35 @@
 version: 2.1
 setup: true
 
+parameters:
+  action:
+    type: string
+    default: "tests"
+  ecr-repository:
+    type: string
+    default: ""
+  tfvars:
+    type: string
+    default: ""
+  k8s-cluster:
+    type: string
+    default: ""
+  workspace:
+    type: string
+    default: ""
+  rails-env:
+    type: string
+    default: "staging"
+  packages-to-install:
+    type: string
+    default: ""
+  assets-bucket:
+    type: string
+    default: ""
+  use-docker-cache:
+    type: boolean
+    default: true
+
 orbs:
   continuation: circleci/continuation@0.1.2
 
