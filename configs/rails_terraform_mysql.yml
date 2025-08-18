@@ -336,6 +336,10 @@ jobs:
             IGNORE="$IGNORE CVE-2024-37031"
             # Skip CVE on ActionPack < 7.0 about dynamically set CSP headers
             IGNORE="$IGNORE CVE-2024-54133"
+            # Skip CVE on ActiveStorage as it is not used
+            IGNORE="$IGNORE CVE-2025-24293"
+            # Skip CVE on ActiveRecord < 7.1 as it affects only find done in terminal
+            IGNORE="$IGNORE CVE-2025-55193"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
