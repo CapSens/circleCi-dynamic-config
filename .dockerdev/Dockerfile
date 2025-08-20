@@ -25,6 +25,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   libjemalloc2 \
   libpq5 \
   shared-mime-info \
+  ca-certificates \
   $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs) \
   && rm -rf /var/lib/apt/lists/*
 
