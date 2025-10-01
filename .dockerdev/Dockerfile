@@ -26,8 +26,29 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   libpq5 \
   shared-mime-info \
   ca-certificates \
-  $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | xargs) \
+  $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | grep -v "google-chrome-stable" | xargs) \
   && rm -rf /var/lib/apt/lists/*
+
+RUN if echo "$PACKAGES_TO_INSTALL" | grep -q "google-chrome-stable"; then \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=tmpfs,target=/var/log \
+    rm -f /etc/apt/apt.conf.d/docker-clean; \
+    apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+    wget \
+    fonts-liberation \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    xdg-utils \
+    && wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && dpkg -i google-chrome-stable_current_amd64.deb \
+    && apt-get install -f \
+    && rm google-chrome-stable_current_amd64.deb \
+    && rm -rf /var/lib/apt/lists/*; \
+  fi
 
 ARG PIP_PACKAGES=""
 RUN if test -n "$PIP_PACKAGES" ; \
