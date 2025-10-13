@@ -119,7 +119,12 @@ commands: # a reusable command with parameters
       - run:
           name: Clone Terraform repository
           command: |
-            git clone https://x-access-token:$GITHUB_TOKEN@github.com/CapSens/terraform-infra.git terraform_infra
+            if [ "<< pipeline.parameters.k8s-cluster >>" = "eks_staging" ]; then
+              branch="staging"
+            else
+              branch="main"
+            fi
+            git clone -b $branch --single-branch https://x-access-token:$GITHUB_TOKEN@github.com/CapSens/terraform-infra.git terraform_infra
 
       - run:
           name: Create tfvars file
