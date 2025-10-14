@@ -354,6 +354,13 @@ jobs:
             fi
 
             bundle audit --update $IGNORE
+      - run: 
+          name: "Vérifier la suppression de :email dans filter_parameter_logging.rb"
+          command: |
+            if grep -q ":email" config/initializers/filter_parameter_logging.rb; then
+              echo ":email is still present in filter_parameter_logging.rb. Removal is required."
+              exit 1
+            fi
       - run:
           name: "Audit de securité de l'application"
           command: |
