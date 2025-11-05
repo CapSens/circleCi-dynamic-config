@@ -206,11 +206,11 @@ jobs:
           RAILS_ENV: test
     steps:
       - setup_env
-      - restore_cache:
-          name: "restore bundler cache"
-          keys:
-            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
-            - my-app-bundler
+      # - restore_cache:
+      #     name: "restore bundler cache"
+      #     keys:
+      #       - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+      #       - my-app-bundler
       - run:
           name: Bundle install
           command: |
@@ -263,11 +263,11 @@ jobs:
     parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
-      - restore_cache:
-          name: "restore bundler cache"
-          keys:
-            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
-            - my-app-bundler
+      # - restore_cache:
+      #     name: "restore bundler cache"
+      #     keys:
+      #       - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+      #       - my-app-bundler
       - restore_cache:
           name: "restore yarn cache"
           keys:
@@ -354,7 +354,7 @@ jobs:
             fi
 
             bundle audit --update $IGNORE
-      - run: 
+      - run:
           name: "Check if :email is removed from filter_parameter_logging.rb"
           command: |
             if [ -f config/initializers/filter_parameter_logging.rb ]; then
