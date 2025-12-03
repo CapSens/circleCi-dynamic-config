@@ -71,10 +71,10 @@ ENV RAILS_ENV=$RAILS_ENV \
   MALLOC_CONF=narenas:2 \
   BUNDLE_WITHOUT="development test"
 
-# Upgrade RubyGems if possible
+# Upgrade RubyGems if possible (avoid v4 for now while no stable config is found)
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
-    gem update --system --no-document; \
+    gem update --system 3.5.23 --no-document; \
   elif echo -e "2.7\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system 3.4.22 --no-document; \
