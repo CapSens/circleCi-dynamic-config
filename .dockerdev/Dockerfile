@@ -27,6 +27,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   shared-mime-info \
   ca-certificates \
   $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | grep -v "google-chrome-stable" | xargs) \
+  && update-ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 RUN if echo "$PACKAGES_TO_INSTALL" | grep -q "google-chrome-stable"; then \
