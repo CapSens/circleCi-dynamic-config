@@ -71,10 +71,9 @@ ENV RAILS_ENV=$RAILS_ENV \
   MALLOC_CONF=narenas:2 \
   BUNDLE_WITHOUT="development test"
 
-# Upgrade RubyGems if possible (avoid v4 for now while no stable config is found)
 RUN if echo -e "3.1\n$RUBY_VERSION" | sort -V -C ; \
   then \
-    gem update --system 3.5.23 --no-document; \
+    gem update --system --no-document; \
   elif echo -e "2.7\n$RUBY_VERSION" | sort -V -C ; \
   then \
     gem update --system 3.4.22 --no-document; \
@@ -127,10 +126,10 @@ RUN mkdir -p $BUNDLE_PATH \
   && sed -i 's/git@github.com:/https:\/\/github.com\//g' Gemfile Gemfile.lock \
   && sed -i '/letter_opener_web/s/.*/  gem "letter_opener_web", git: "https:\/\/github.com\/CapSens\/letter_opener_web.git", branch: "master"/' Gemfile \
   && bundle lock \
-  && bundle config --local path "${BUNDLE_PATH}" \
-  && bundle config set clean "true" \
-  && bundle config set no-cache "true" \
-  && bundle config --local without "development:test" \
+  && bundle config set --local path "${BUNDLE_PATH}" \
+  && bundle config set --local clean true \
+  && bundle config set --local without development test \
+  && bundle config set --local bin "${BUNDLE_PATH}/bin" \
   && bundle lock --add-platform x86_64-linux \
   && bundle install --jobs=${BUNDLE_JOBS} \
   && rm -rf $BUNDLE_PATH/.bundle $BUNDLE_PATH/ruby/*/cache/* $BUNDLE_PATH/ruby/*/bundler/gems/*/.git
