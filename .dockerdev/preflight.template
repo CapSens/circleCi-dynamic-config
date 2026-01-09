@@ -1,0 +1,65 @@
+#!/bin/bash
+# Pre-flight validation script for Rails applications
+#
+# This script validates that the application can start successfully before running migrations.
+# It should be added to your Docker image and made executable.
+#
+# Usage in Dockerfile:
+#   COPY .dockerdev/preflight.template /app/bin/preflight
+#   RUN chmod +x /app/bin/preflight
+#
+# The script receives the following environment variables from Kubernetes:
+#   - SIDEKIQ_ENABLED: "true" if background workers are enabled (var.background.min_replicas > 0)
+#   - All application secrets from kubernetes_secret
+#
+# Exit codes:
+#   0 - All checks passed
+#   1 - One or more checks failed
+
+set -e  # Exit immediately if a command exits with a non-zero status
+
+echo "🚀 Pre-flight validation starting..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Test 1: Database connection
+echo ""
+echo "📊 Testing database connection..."
+if rails runner 'ActiveRecord::Base.connection.execute("SELECT 1")' 2>&1; then
+  echo "✅ Database connection successful"
+else
+  echo "❌ Database connection failed"
+  exit 1
+fi
+
+# Test 2: Redis/Sidekiq connection (if enabled)
+if [ "$SIDEKIQ_ENABLED" = "true" ]; then
+  echo ""
+  echo "🔴 Testing Redis/Sidekiq connection..."
+  if rails runner 'Sidekiq.redis(&:ping)' 2>&1; then
+    echo "✅ Redis/Sidekiq connection successful"
+  else
+    echo "❌ Redis/Sidekiq connection failed"
+    exit 1
+  fi
+else
+  echo ""
+  echo "⏭️  Skipping Redis/Sidekiq check (background workers disabled)"
+fi
+
+# Test 3: Rails environment verification
+echo ""
+echo "⚙️  Verifying Rails environment..."
+RAILS_ENV_OUTPUT=$(rails runner 'puts Rails.env' 2>&1)
+if [ $? -eq 0 ]; then
+  echo "✅ Rails environment: $RAILS_ENV_OUTPUT"
+else
+  echo "❌ Rails environment check failed"
+  exit 1
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ All pre-flight checks passed successfully!"
+echo ""
+
+exit 0

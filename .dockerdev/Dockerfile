@@ -197,6 +197,9 @@ RUN sed -i 's/\(.*public_file_server\.enabled.*= \).*/\1true/' config/environmen
 COPY .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 # Copy letter_opener config to use it with S3
 COPY .dockerdev/letter_opener_config.rb /home/my_user/app/config/initializers/letter_opener.rb
+# Copy preflight script that validate all app components works before deployment
+COPY .dockerdev/preflight.template /app/bin/preflight
+RUN chmod +x /app/bin/preflight
 
 # Copy artifacts
 # 1) Installed gems
