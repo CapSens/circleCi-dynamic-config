@@ -93,6 +93,11 @@ parameters:
     description: "Postgres image version used by CI"
     type: string
     default: "16"
+  caches-base-key:
+    description: "Base key for caches - change is to invalidate all caches"
+    type: string
+    default: "my-app"
+
 
 commands: # a reusable command with parameters
   setup_env:
@@ -209,8 +214,8 @@ jobs:
       - restore_cache:
           name: "restore bundler cache"
           keys:
-            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
-            - my-app-bundler
+            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-bundler
       - run:
           name: Bundle install
           command: |
@@ -218,21 +223,21 @@ jobs:
             bundle install
       - save_cache:
           name: "save bundler cache"
-          key: my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+          key: << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
           paths:
               - vendor/bundle
       - restore_cache:
           name: "restore yarn cache"
           keys:
-            - my-app-yarn-{{ checksum "yarn.lock" }}-1
-            - my-app-yarn-
+            - << pipeline.parameters.caches-base-key >>-yarn-{{ checksum "yarn.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-yarn-
       - run:
           name: Yarn install
           command: |
             yarn install || true
       - save_cache:
           name: "save yarn cache"
-          key: my-app-yarn-{{ checksum "Gemfile.lock" }}-1
+          key: << pipeline.parameters.caches-base-key >>-yarn-{{ checksum "Gemfile.lock" }}-1
           paths:
               - node_modules
 
@@ -266,13 +271,13 @@ jobs:
       - restore_cache:
           name: "restore bundler cache"
           keys:
-            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
-            - my-app-bundler
+            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-bundler
       - restore_cache:
           name: "restore yarn cache"
           keys:
-            - my-app-yarn-{{ checksum "yarn.lock" }}-1
-            - my-app-yarn-
+            - << pipeline.parameters.caches-base-key >>-yarn-{{ checksum "yarn.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-yarn-
       - run:
           name: Bundle install
           command: |
