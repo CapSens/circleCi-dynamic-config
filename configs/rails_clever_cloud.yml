@@ -238,14 +238,15 @@ jobs:
       - run:
           name: "Compile and serve assets"
           command: |
-            export ASSETS_ENV=<< pipeline.parameters.rails-env >>
+            export RAILS_ENV=<< pipeline.parameters.rails-env >>
             export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket >>
+            export RAILS_MASTER_KEY=
 
-            echo "ready to copy assets for env ${current_env} on assets bucket ${bucket}"
+            echo "ready to copy assets for env ${RAILS_ENV} on assets bucket ${bucket}"
 
             yarn
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
-            RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
+            bundle exec rake db:create db:migrate
+            bundle exec rake assets:clobber assets:precompile
             aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com sync public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
 
             if [ -d "public/packs" ]; then
