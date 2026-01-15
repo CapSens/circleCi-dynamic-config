@@ -1,0 +1,365 @@
+version: 2.1
+
+parameters:
+  action:
+    description: "worflow to trigger. must be in [tests, build-and-deploy, deploy, undeploy]"
+    type: string
+    default: "tests"
+  project-name:
+    type: string
+    default: 'my-project' # must match pg_username and pg_database into database.yml.ci
+  ruby-version:
+    type: string
+    default: "2.7.1"
+  bundler-version:
+    type: string
+    default: "2.2.16"
+  rails-env:
+    type: string
+    default: "staging"
+  assets-bucket:
+    type: string
+    default: ""
+  ignored_cves:
+    type: string
+    default: ""
+  packages-for-tests:
+    type: string
+    default: ""
+  tests-parallelism:
+    type: integer
+    default: 1
+  resource-class:
+    type: string
+    default: "medium"
+  assets-resource-class: # platforms with webpacker needs a bigger instance than small
+    type: string
+    default: "small"
+  clever-cloud-app-id:
+    type: string
+    default: ""
+
+commands: # a reusable command with parameters
+  setup_env:
+    steps:
+      - checkout
+      - run:
+          name: Database Config
+          command: cp config/database.yml.ci config/database.yml
+      - run:
+          name: Install Bundler
+          # mettre ici la meme version que celle utilisée pour générer le gemfile.lock sinon le cache ne marchera pas
+          command: |
+            if [ -n "<< pipeline.parameters.bundler-version >>" ]; then
+              gem install bundler:<< pipeline.parameters.bundler-version >>
+            else
+              gem install bundler
+            fi
+
+jobs:
+  auto_cancel_redundant_workflows:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - run:
+          name: "cancel_redundant_workflows"
+          command: |
+            ## Get the name of the workflow and the related pipeline number
+            curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}" -o current_workflow.json
+            WF_NAME=$(jq -r '.name' current_workflow.json)
+            CURRENT_PIPELINE_NUM=$(jq -r '.pipeline_number' current_workflow.json)
+
+            ## Get the IDs of pipelines created by the current user on the same branch. (Only consider pipelines that have a pipeline number inferior to the current pipeline)
+            PIPE_IDS=$(curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=$CIRCLE_BRANCH"|jq -r --arg CIRCLE_USERNAME "$CIRCLE_USERNAME" --argjson CURRENT_PIPELINE_NUM "$CURRENT_PIPELINE_NUM" '.items[]|select(.state == "created")|select(.trigger.actor.login == $CIRCLE_USERNAME)|select(.number < $CURRENT_PIPELINE_NUM)|.id')
+
+            ## Get the IDs of currently running/on_hold workflows that have the same name as the current workflow, in all previously created pipelines.
+            if [ ! -z "$PIPE_IDS" ]; then
+              for PIPE_ID in $PIPE_IDS
+              do
+                curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request GET "https://circleci.com/api/v2/pipeline/${PIPE_ID}/workflow"|jq -r --arg WF_NAME "${WF_NAME}" '.items[]|select(.status == "on_hold" or .status == "running") | select(.name == $WF_NAME) | .id' >> WF_to_cancel.txt
+              done
+            fi
+
+            ## Cancel any currently running/on_hold workflow with the same name
+            if [ -s WF_to_cancel.txt ]; then
+              echo "Cancelling the following workflow(s):"
+              cat WF_to_cancel.txt
+              while read WF_ID;
+                do
+                  curl --header "Circle-Token: $CIRCLE_CI_TOKEN" --request POST https://circleci.com/api/v2/workflow/$WF_ID/cancel
+                done < WF_to_cancel.txt
+              ## Allowing some time to complete the cancellation
+              sleep 2
+              else
+                echo "Nothing to cancel"
+            fi
+
+  save_and_restore_caches:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+    steps:
+      - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - save_cache:
+          name: "save bundler cache"
+          key: my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - vendor/bundle
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Yarn install
+          command: |
+            yarn install || true
+      - save_cache:
+          name: "save yarn cache"
+          key: my-app-yarn-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - node_modules
+
+  spec:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+      - image: cimg/redis:6.2.6
+      - image: postgres:12
+        environment:
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+      - image: docker.elastic.co/elasticsearch/elasticsearch:6.7.0
+        environment:
+          - cluster.name: elasticsearch
+          - xpack.security.enabled: false
+          - transport.host: localhost
+          - network.host: 127.0.0.1
+          - http.port: 9200
+          - discovery.type: single-node
+    parallelism: << pipeline.parameters.tests-parallelism >>
+    steps:
+      - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - when:
+          condition: << pipeline.parameters.packages-for-tests >>
+          steps:
+            - run:
+                name: Additional packages
+                command: |
+                  apt update && apt-get install -y --fix-missing << pipeline.parameters.packages-for-tests >>
+      - run:
+          name: Database initialization
+          command: bundle exec rake db:create db:migrate
+      - run:
+          name: Test
+          no_output_timeout: 15m
+          command: |
+            yarn
+            mkdir /tmp/test-results
+            if ! bundle info rspec_junit_formatter > /dev/null 2>&1; then
+              bundle add rspec_junit_formatter
+              bundle install
+            fi
+            circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings > /tmp/tests-to-run
+            bundle exec rspec $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
+
+      - store_test_results:
+          path: /tmp/test-results
+
+  assets:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.assets-resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+      - image: postgres:12
+        environment:
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+    steps:
+      - setup_env
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - run:
+          name: "Compile and serve assets"
+          command: |
+            export ASSETS_ENV=<< pipeline.parameters.rails-env >>
+            export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket >>
+
+            echo "ready to copy assets for env ${current_env} on assets bucket ${bucket}"
+
+            yarn
+            RAILS_ENV=${ASSETS_ENV} bundle exec rake db:create db:migrate
+            RAILS_ENV=${ASSETS_ENV} bundle exec rake assets:clobber assets:precompile
+            aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com sync public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+
+            if [ -d "public/packs" ]; then
+              aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com sync public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --recursive --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+            else
+              echo "No public/packs directory, skipping packs upload."
+            fi
+
+  security_check:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: small
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          RAILS_ENV: test
+    steps:
+      - checkout
+      - run:
+          name: "Audit Securité du Gemfile"
+          command: |
+            gem install bundler-audit
+
+            IGNORE="<< pipeline.parameters.ignored_cves >>"
+            set +e
+            OAUTH_CRSF_FOUND=`grep -c -m1 omniauth-rails_csrf_protection Gemfile`
+            SHRINE_CHECK=`grep -hrc derivation_endpoint -- config/initializers app/uploaders | awk '{s+=$1} END {print s}'`
+            set -e
+            if [ $OAUTH_CRSF_FOUND -eq 1 ]; then
+              IGNORE="$IGNORE CVE-2015-9284"
+            fi
+            if [ $SHRINE_CHECK -eq 0 ]; then
+              IGNORE="$IGNORE CVE-2020-15237"
+            fi
+            IGNORE="$IGNORE CVE-2024-26143"
+            # Skip CVEs for applications using ActiveAdmin < 3.2.0
+            IGNORE="$IGNORE CVE-2023-51763"
+            IGNORE="$IGNORE CVE-2024-37031"
+            # Skip CVE on ActionPack < 7.0 about dynamically set CSP headers
+            IGNORE="$IGNORE CVE-2024-54133"
+            if [ -n "$IGNORE" ]; then
+              IGNORE="--ignore $IGNORE"
+            fi
+
+            bundle audit --update $IGNORE
+      - run: 
+          name: "Check if :email is removed from filter_parameter_logging.rb"
+          command: |
+            if [ -f config/initializers/filter_parameter_logging.rb ]; then
+              if grep -q ":email" config/initializers/filter_parameter_logging.rb; then
+                echo ":email is still present in filter_parameter_logging.rb. Removal is required."
+                exit 1
+              fi
+            else
+              echo "File config/initializers/filter_parameter_logging.rb does not exist. Skipping check."
+            fi
+      - run:
+          name: "Audit de securité de l'application"
+          command: |
+            gem install brakeman -v 5.4.1
+            mkdir -p security
+            brakeman -o security/brakeman.html || true
+      - store_artifacts:
+          path: security/brakeman.html
+  clever_cloud_deploy:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: small
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+    steps:
+      - checkout
+      - run:
+          name: clever deploy
+          command: |
+            # CLEVER_SSH_KEY variable can be generated with the commande : `cat /path/to/private/key | sed 's/$/\\n/' | tr -d '\n'`
+            echo $CLEVER_SSH_KEY | sed 's/\\n/\n/g' > ~/.ssh/clever
+            chmod 400 ~/.ssh/clever
+            ssh-add ~/.ssh/clever
+
+            if [ ! -n "$(grep "^push-n2-par-clevercloud-customers" ~/.ssh/known_hosts)" ]
+            then
+              ssh-keyscan push-n2-par-clevercloud-customers.services.clever-cloud.com >> ~/.ssh/known_hosts 2>/dev/null
+            fi
+
+            git config user.email "infra@capsens"
+            git remote add clever git+ssh://git@push-n2-par-clevercloud-customers.services.clever-cloud.com/<< pipeline.parameters.clever-cloud-app-id >>.git
+            git push -u clever $CIRCLE_BRANCH:master --force
+
+workflows:
+  version: 2
+
+  workflow:
+    when:
+      equal: [ tests, << pipeline.parameters.action >> ]
+
+    jobs:
+        - auto_cancel_redundant_workflows:
+            context:
+              - COMMON
+        - save_and_restore_caches
+        - spec:
+            requires:
+              - save_and_restore_caches
+
+        - security_check
+
+  build-and-deploy:
+    when:
+      equal: [ build-and-deploy, << pipeline.parameters.action >> ]
+
+    jobs:
+        - assets:
+            context:
+              - CLEVER_CLOUD
+
+        - clever_cloud_deploy:
+            context: CLEVER_CLOUD
+            requires: ['assets']
