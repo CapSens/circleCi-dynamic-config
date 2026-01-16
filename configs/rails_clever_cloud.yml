@@ -38,6 +38,9 @@ parameters:
   clever-cloud-app-id:
     type: string
     default: ""
+  clever-cloud-remote-host:
+    type: string
+    default: ""
 
 commands: # a reusable command with parameters
   setup_env:
@@ -167,16 +170,16 @@ jobs:
           keys:
             - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
             - my-app-bundler
-      - restore_cache:
-          name: "restore yarn cache"
-          keys:
-            - my-app-yarn-{{ checksum "yarn.lock" }}-1
-            - my-app-yarn-
       - run:
           name: Bundle install
           command: |
             bundle config set --local path 'vendor/bundle'
             bundle install
+      - save_cache:
+          name: "save bundler cache"
+          key: my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+          paths:
+              - vendor/bundle
       - when:
           condition: << pipeline.parameters.packages-for-tests >>
           steps:
@@ -327,11 +330,11 @@ jobs:
 
             if [ ! -n "$(grep "^push-n2-par-clevercloud-customers" ~/.ssh/known_hosts)" ]
             then
-              ssh-keyscan push-n2-par-clevercloud-customers.services.clever-cloud.com >> ~/.ssh/known_hosts 2>/dev/null
+              ssh-keyscan << pipeline.parameters.clever-cloud-remote-host >> >> ~/.ssh/known_hosts 2>/dev/null
             fi
 
             git config user.email "infra@capsens"
-            git remote add clever git+ssh://git@push-n2-par-clevercloud-customers.services.clever-cloud.com/<< pipeline.parameters.clever-cloud-app-id >>.git
+            git remote add clever git+ssh://git@<< pipeline.parameters.clever-cloud-remote-host >>/<< pipeline.parameters.clever-cloud-app-id >>.git
             git push -u clever $CIRCLE_BRANCH:master --force
 
 workflows:
