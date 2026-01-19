@@ -41,6 +41,9 @@ parameters:
   clever-cloud-remote-host:
     type: string
     default: ""
+  commit-to-deploy:
+    type: string
+    default: ""
 
 commands: # a reusable command with parameters
   setup_env:
@@ -147,21 +150,13 @@ jobs:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
-      - image: cimg/redis:6.2.6
-      - image: postgres:12
+      - image: redis:6.2-alpine
+      - image: postgres:16-alpine
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
           POSTGRES_DB: << pipeline.parameters.project-name >>
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
-      - image: docker.elastic.co/elasticsearch/elasticsearch:6.7.0
-        environment:
-          - cluster.name: elasticsearch
-          - xpack.security.enabled: false
-          - transport.host: localhost
-          - network.host: 127.0.0.1
-          - http.port: 9200
-          - discovery.type: single-node
     parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
@@ -205,58 +200,6 @@ jobs:
 
       - store_test_results:
           path: /tmp/test-results
-
-  assets:
-    working_directory: ~/<< pipeline.parameters.project-name >>
-    resource_class: << pipeline.parameters.assets-resource-class >>
-    docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
-        environment:
-          PGHOST: localhost
-          PGUSER: << pipeline.parameters.project-name >>
-          RAILS_ENV: test
-      - image: postgres:12
-        environment:
-          POSTGRES_USER: << pipeline.parameters.project-name >>
-          POSTGRES_DB: << pipeline.parameters.project-name >>
-          POSTGRES_PASSWORD: ""
-          POSTGRES_HOST_AUTH_METHOD: trust
-    steps:
-      - setup_env
-      - restore_cache:
-          name: "restore bundler cache"
-          keys:
-            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
-            - my-app-bundler
-      - restore_cache:
-          name: "restore yarn cache"
-          keys:
-            - my-app-yarn-{{ checksum "yarn.lock" }}-1
-            - my-app-yarn-
-      - run:
-          name: Bundle install
-          command: |
-            bundle config set --local path 'vendor/bundle'
-            bundle install
-      - run:
-          name: "Compile and serve assets"
-          command: |
-            export RAILS_ENV=<< pipeline.parameters.rails-env >>
-            export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket >>
-            export RAILS_MASTER_KEY=
-
-            echo "ready to copy assets for env ${RAILS_ENV} on assets bucket ${bucket}"
-
-            yarn
-            bundle exec rake db:create db:migrate
-            bundle exec rake assets:clobber assets:precompile
-            aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com sync public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
-
-            if [ -d "public/packs" ]; then
-              aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com sync public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
-            else
-              echo "No public/packs directory, skipping packs upload."
-            fi
 
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -313,6 +256,77 @@ jobs:
             brakeman -o security/brakeman.html || true
       - store_artifacts:
           path: security/brakeman.html
+
+  assets:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: << pipeline.parameters.assets-resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+      - image: postgres:16-alpine
+        environment:
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+    steps:
+      - setup_env
+      - when:
+          condition: << pipeline.parameters.commit-to-deploy >>
+          steps:
+            - run:
+                name: Checkout specific commit
+                command: git checkout << pipeline.parameters.commit-to-deploy >>
+      - run:
+          name: Database Config
+          command: cp config/database.yml.ci config/database.yml
+      - run:
+          name: Install Bundler
+          # mettre ici la meme version que celle utilisée pour générer le gemfile.lock sinon le cache ne marchera pas
+          command: |
+            if [ -n "<< pipeline.parameters.bundler-version >>" ]; then
+              gem install bundler:<< pipeline.parameters.bundler-version >>
+            else
+              gem install bundler
+            fi
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - restore_cache:
+          name: "restore yarn cache"
+          keys:
+            - my-app-yarn-{{ checksum "yarn.lock" }}-1
+            - my-app-yarn-
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - run:
+          name: "Compile and serve assets"
+          command: |
+            export RAILS_ENV=<< pipeline.parameters.rails-env >>
+            export S3_ASSETS_BUCKET=<< pipeline.parameters.assets-bucket >>
+            export RAILS_MASTER_KEY=
+
+            echo "ready to copy assets for env ${RAILS_ENV} on assets bucket ${bucket}"
+
+            yarn
+            bundle exec rake db:create db:migrate
+            bundle exec rake assets:clobber assets:precompile
+            aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com sync public/assets/ s3://${S3_ASSETS_BUCKET}/assets/ --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+
+            if [ -d "public/packs" ]; then
+              aws s3 --endpoint-url https://cellar-c2.services.clever-cloud.com sync public/packs/ s3://${S3_ASSETS_BUCKET}/packs/ --acl public-read --cache-control max-age=${CACHE_MAX_AGE:-86400}
+            else
+              echo "No public/packs directory, skipping packs upload."
+            fi
+
   clever_cloud_deploy:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
@@ -320,6 +334,12 @@ jobs:
       - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
     steps:
       - checkout
+      - when:
+          condition: << pipeline.parameters.commit-to-deploy >>
+          steps:
+            - run:
+                name: Checkout specific commit
+                command: git checkout << pipeline.parameters.commit-to-deploy >>
       - run:
           name: clever deploy
           command: |
@@ -335,7 +355,7 @@ jobs:
 
             git config user.email "infra@capsens"
             git remote add clever git+ssh://git@<< pipeline.parameters.clever-cloud-remote-host >>/<< pipeline.parameters.clever-cloud-app-id >>.git
-            git push -u clever $CIRCLE_BRANCH:master --force
+            git push -u clever HEAD:master --force
 
 workflows:
   version: 2
