@@ -1,25 +1,63 @@
 #!/usr/bin/env ruby
 
 require 'bundler/setup'
-require 'redis'
+
+# Detect which Redis gem is available
+# Sidekiq 7+ uses redis-client, older versions use redis
+begin
+  require 'redis-client'
+  REDIS_GEM = :redis_client
+rescue LoadError
+  begin
+    require 'redis'
+    REDIS_GEM = :redis
+  rescue LoadError
+    abort "Error: Neither 'redis-client' nor 'redis' gem found. Please add one to your Gemfile."
+  end
+end
+
+def create_redis_connection(url)
+  case REDIS_GEM
+  when :redis_client
+    RedisClient.config(url: url).new_client
+  when :redis
+    Redis.new(url: url)
+  end
+end
+
+def redis_call(client, command, *args)
+  case REDIS_GEM
+  when :redis_client
+    client.call(command, *args)
+  when :redis
+    client.send(command.downcase, *args)
+  end
+end
 
 def main
   redis_url = ENV.fetch('REDIS_URL')
   redis_db = ENV.fetch('REDIS_DB', '0')
   url = redis_url.include?('/') ? redis_url : "#{redis_url}/#{redis_db}"
 
-  redis = Redis.new(url: url)
+  redis = create_redis_connection(url)
 
   loop do
     begin
-      queues = redis.smembers('queues')
-      total = queues.sum { |queue| redis.llen("queue:#{queue}").to_i }
+      # Get all Sidekiq queues
+      queues = redis_call(redis, 'SMEMBERS', 'queues')
 
-      # Créer une liste avec N éléments
-      redis.del('sidekiq:metrics:total_jobs')
-      redis.rpush('sidekiq:metrics:total_jobs', ['x'] * total) if total > 0
-      redis.expire('sidekiq:metrics:total_jobs', 60)
-      puts "[#{Time.now}] Total: #{total} jobs across #{queues.size} queues"
+      # Calculate total jobs across all queues
+      total = queues.sum { |queue| redis_call(redis, 'LLEN', "queue:#{queue}").to_i }
+
+      # Store as Redis list (KEDA reads list length)
+      # Create list with N elements where N = total jobs
+      redis_call(redis, 'DEL', 'sidekiq:metrics:total_jobs')
+      if total > 0
+        redis_call(redis, 'RPUSH', 'sidekiq:metrics:total_jobs', *(['x'] * total))
+      end
+      redis_call(redis, 'EXPIRE', 'sidekiq:metrics:total_jobs', 60)
+
+      puts "[#{Time.now}] Total: #{total} jobs across #{queues.size} queues (using #{REDIS_GEM})"
     rescue => e
       puts "[#{Time.now}] Error: #{e.class} - #{e.message}"
     end
