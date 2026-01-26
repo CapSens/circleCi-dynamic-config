@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'redis'
+
+def main
+  redis_url = ENV.fetch('REDIS_URL')
+  redis_db = ENV.fetch('REDIS_DB', '0')
+  url = redis_url.include?('/') ? redis_url : "#{redis_url}/#{redis_db}"
+
+  redis = Redis.new(url: url)
+
+  loop do
+    begin
+      queues = redis.smembers('queues')
+      total = queues.sum { |queue| redis.llen("queue:#{queue}").to_i }
+
+      # Créer une liste avec N éléments
+      redis.del('sidekiq:metrics:total_jobs')
+      redis.rpush('sidekiq:metrics:total_jobs', ['x'] * total) if total > 0
+      redis.expire('sidekiq:metrics:total_jobs', 60)
+      puts "[#{Time.now}] Total: #{total} jobs across #{queues.size} queues"
+    rescue => e
+      puts "[#{Time.now}] Error: #{e.class} - #{e.message}"
+    end
+    sleep 30
+  end
+end
+
+main if __FILE__ == $PROGRAM_NAME

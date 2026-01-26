@@ -199,7 +199,10 @@ COPY .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 COPY .dockerdev/letter_opener_config.rb /home/my_user/app/config/initializers/letter_opener.rb
 # Copy preflight script that validate all app components works before deployment
 COPY .dockerdev/preflight.template /app/bin/preflight
-RUN chmod +x /app/bin/preflight
+# Copy sidekiq_metrics script in order to run it as a sidecar container to enable keda autoscaling on background pods
+COPY .dockerdev/sidekiq_metrics.template /home/my_user/app/bin/sidekiq_metrics
+
+RUN chmod +x /app/bin/preflight /home/my_user/app/bin/sidekiq_metrics
 
 # Copy artifacts
 # 1) Installed gems
