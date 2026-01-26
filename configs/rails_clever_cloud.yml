@@ -348,7 +348,7 @@ jobs:
             chmod 400 ~/.ssh/clever
             ssh-add ~/.ssh/clever
 
-            if [ ! -n "$(grep "^push-n2-par-clevercloud-customers" ~/.ssh/known_hosts)" ]
+            if [ ! -n "$(grep "^<< pipeline.parameters.clever-cloud-remote-host >>" ~/.ssh/known_hosts)" ]
             then
               ssh-keyscan << pipeline.parameters.clever-cloud-remote-host >> >> ~/.ssh/known_hosts 2>/dev/null
             fi
