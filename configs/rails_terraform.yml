@@ -382,7 +382,7 @@ jobs:
   build:
     working_directory: /tmp/app
     docker:
-      - image: cimg/aws:2023.09
+      - image: cimg/aws:2025.01
     steps:
       - checkout
       - setup_remote_docker:
