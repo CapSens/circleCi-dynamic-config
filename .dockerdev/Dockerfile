@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   libpq5 \
   shared-mime-info \
   ca-certificates \
-  $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | grep -v "google-chrome-stable" | xargs) \
+  $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | grep -v "google-chrome-stable" | grep -v "1password-cli" | xargs) \
   && rm -rf /var/lib/apt/lists/*
 
 RUN if echo "$PACKAGES_TO_INSTALL" | grep -q "google-chrome-stable"; then \
@@ -159,6 +159,8 @@ RUN ( \
 )
 
 # Finally, our production image definition
+# 1Password CLI: stage used to conditionally install `op` binary (see COPY --from=op-cli below)
+FROM 1password/op:2 AS op-cli
 FROM base AS production
 SHELL ["/bin/bash", "-c"]
 WORKDIR "/home/my_user/app"
@@ -175,6 +177,15 @@ RUN test -n "$FORCE_NODE" \
   && rm -rf /var/lib/apt/lists/* \
   && npm install -g yarn \
   || echo "nodejs not mandatory for production environment"
+
+# Install 1Password CLI if "1password-cli" is in PACKAGES_TO_INSTALL
+COPY --from=op-cli /usr/local/bin/op /tmp/op
+ARG PACKAGES_TO_INSTALL=""
+RUN if echo "$PACKAGES_TO_INSTALL" | grep -q "1password-cli"; then \
+    mv /tmp/op /usr/local/bin/op; \
+  else \
+    rm -f /tmp/op; \
+  fi
 
 # add policy to allow convert images to PDF with imagemagick if it's installed
 RUN if command -v convert &> /dev/null; \
