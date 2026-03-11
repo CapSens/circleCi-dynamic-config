@@ -26,8 +26,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   libpq5 \
   shared-mime-info \
   ca-certificates \
-  $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | grep -v "google-chrome-stable" | grep -v "1password-cli" | xargs) \
+  $(echo $PACKAGES_TO_INSTALL | xargs -n1 | sort -u | grep -v "google-chrome-stable" | grep -v "1password-cli" | grep -v "wkhtmltopdf_patched_qt" | xargs) \
   && rm -rf /var/lib/apt/lists/*
+
+RUN if echo "$PACKAGES_TO_INSTALL" | grep -q "wkhtmltopdf_patched_qt"; then \
+    apt-get update \
+    && curl -L https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-3/wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+       -o wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+    && apt-get install -y ./wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+    && rm wkhtmltox_0.12.6.1-3.bookworm_amd64.deb \
+    && rm -rf /var/lib/apt/lists/*; \
+  fi
 
 RUN if echo "$PACKAGES_TO_INSTALL" | grep -q "google-chrome-stable"; then \
     --mount=type=cache,target=/var/cache/apt,sharing=locked \
