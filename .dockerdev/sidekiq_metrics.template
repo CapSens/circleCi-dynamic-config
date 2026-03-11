@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'bundler/setup'
+require 'uri'
 
 # Detect which Redis gem is available
 # Sidekiq 7+ uses redis-client, older versions use redis
@@ -37,7 +38,8 @@ end
 def main
   redis_url = ENV.fetch('REDIS_URL')
   redis_db = ENV.fetch('REDIS_DB', '0')
-  url = redis_url.include?('/') ? redis_url : "#{redis_url}/#{redis_db}"
+  uri = URI.parse(redis_url)
+  url = uri.path.match?(%r{^/\d+$}) ? redis_url : "#{redis_url.chomp('/')}/#{redis_db}"
 
   redis = create_redis_connection(url)
 
