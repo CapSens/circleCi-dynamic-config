@@ -354,6 +354,8 @@ jobs:
             IGNORE="$IGNORE CVE-2025-24293"
             # Skip CVE on ActiveRecord < 7.1 as it affects only find done in terminal
             IGNORE="$IGNORE CVE-2025-55193"
+            # Ignore Devise 4 CVE while we upgrade all platforms (to be removed)
+            IGNORE="$IGNORE GHSA-57hq-95w6-v4fc"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi

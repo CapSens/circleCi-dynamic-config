@@ -232,6 +232,8 @@ jobs:
             IGNORE="$IGNORE CVE-2024-37031"
             # Skip CVE on ActionPack < 7.0 about dynamically set CSP headers
             IGNORE="$IGNORE CVE-2024-54133"
+            # Ignore Devise 4 CVE while we upgrade all platforms (to be removed)
+            IGNORE="$IGNORE GHSA-57hq-95w6-v4fc"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
