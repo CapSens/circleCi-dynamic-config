@@ -438,16 +438,29 @@ jobs:
               RUBOCOP_CMD="rubocop"
             fi
 
+            git fetch origin staging
+            CHANGED_FILES=$(git diff --name-only --diff-filter=d origin/staging...HEAD -- '*.rb')
+
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "No Ruby files changed, skipping RuboCop."
+              exit 0
+            fi
+
+            echo "Linting $(echo "$CHANGED_FILES" | wc -l | tr -d ' ') changed file(s):"
+            echo "$CHANGED_FILES"
+
             mkdir -p /tmp/rubocop-results
 
             if << pipeline.parameters.rubocop-blocking >>; then
               $RUBOCOP_CMD --config /tmp/capsens_git_hooks/configs/rubocop-config.yml \
                 --format progress \
-                --format json --out /tmp/rubocop-results/rubocop.json
+                --format json --out /tmp/rubocop-results/rubocop.json \
+                $CHANGED_FILES
             else
               $RUBOCOP_CMD --config /tmp/capsens_git_hooks/configs/rubocop-config.yml \
                 --format progress \
-                --format json --out /tmp/rubocop-results/rubocop.json || true
+                --format json --out /tmp/rubocop-results/rubocop.json \
+                $CHANGED_FILES || true
             fi
       - store_artifacts:
           path: /tmp/rubocop-results/rubocop.json
