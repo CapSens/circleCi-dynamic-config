@@ -367,7 +367,7 @@ jobs:
             fi
 
             bundle audit --update $IGNORE
-      - run: 
+      - run:
           name: "Check if :email is removed from filter_parameter_logging.rb"
           command: |
             if [ -f config/initializers/filter_parameter_logging.rb ]; then
@@ -395,19 +395,26 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Setup SSH for private repos
+          command: |
+            mkdir -p ~/.ssh
+            echo "$CGH_SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - run:
           name: Clone RuboCop shared rules
           command: |
             git clone --depth 1 --filter=blob:none --sparse \
               -b << pipeline.parameters.rubocop-config-branch >> \
-              https://x-access-token:$GITHUB_TOKEN@github.com/CapSens/capsens_git_hooks.git \
-              /tmp/rubocop-rules
-            cd /tmp/rubocop-rules
+              git@github.com:capsens/capsens_git_hooks.git \
+              /tmp/capsens_git_hooks
+            cd /tmp/capsens_git_hooks
             git sparse-checkout set configs
       - run:
           name: Build RuboCop config
           command: |
-            sed "s|<HOOKS_DIRECTORY>|/tmp/rubocop-rules|g" /tmp/rubocop-rules/configs/rubocop.yml \
-              > /tmp/rubocop-rules/configs/rubocop-config.yml
+            sed "s|<HOOKS_DIRECTORY>|/tmp/capsens_git_hooks|g" /tmp/capsens_git_hooks/configs/rubocop.yml \
+              > /tmp/capsens_git_hooks/configs/rubocop-config.yml
       - run:
           name: Install RuboCop
           command: |
@@ -434,11 +441,11 @@ jobs:
             mkdir -p /tmp/rubocop-results
 
             if << pipeline.parameters.rubocop-blocking >>; then
-              $RUBOCOP_CMD --config /tmp/rubocop-rules/configs/rubocop-config.yml \
+              $RUBOCOP_CMD --config /tmp/capsens_git_hooks/configs/rubocop-config.yml \
                 --format progress \
                 --format json --out /tmp/rubocop-results/rubocop.json
             else
-              $RUBOCOP_CMD --config /tmp/rubocop-rules/configs/rubocop-config.yml \
+              $RUBOCOP_CMD --config /tmp/capsens_git_hooks/configs/rubocop-config.yml \
                 --format progress \
                 --format json --out /tmp/rubocop-results/rubocop.json || true
             fi
@@ -583,6 +590,11 @@ workflows:
         - rubocop_lint:
             context:
               - GithubDev
+            filters:
+              branches:
+                ignore:
+                  - master
+                  - staging
 
   build-and-deploy:
     when:
