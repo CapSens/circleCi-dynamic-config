@@ -461,7 +461,9 @@ jobs:
 
             $RUBOCOP_CMD --config /tmp/capsens_git_hooks/configs/rubocop-config.yml \
               --format progress \
-              $CHANGED_FILES ; echo $? > /tmp/lint-results/rubocop.exitcode || true
+              $CHANGED_FILES \
+              && echo 0 > /tmp/lint-results/rubocop.exitcode \
+              || echo $? > /tmp/lint-results/rubocop.exitcode
       - run:
           name: Run ERB Lint
           command: |
@@ -484,7 +486,9 @@ jobs:
             mkdir -p /tmp/lint-results
 
             $ERBLINT_CMD --config /tmp/capsens_git_hooks/configs/erblint-config.yml \
-              $CHANGED_FILES ; echo $? > /tmp/lint-results/erblint.exitcode || true
+              $CHANGED_FILES \
+              && echo 0 > /tmp/lint-results/erblint.exitcode \
+              || echo $? > /tmp/lint-results/erblint.exitcode
       - run:
           name: Run Stylelint
           command: |
@@ -501,7 +505,9 @@ jobs:
             mkdir -p /tmp/lint-results
 
             npx stylelint --config /tmp/capsens_git_hooks/configs/stylelint.config.mjs \
-              $CHANGED_FILES ; echo $? > /tmp/lint-results/stylelint.exitcode || true
+              $CHANGED_FILES \
+              && echo 0 > /tmp/lint-results/stylelint.exitcode \
+              || echo $? > /tmp/lint-results/stylelint.exitcode
       - run:
           name: Check lint results
           command: |
