@@ -351,7 +351,7 @@ jobs:
             # Skip CVE on ActionPack < 7.0 about dynamically set CSP headers
             IGNORE="$IGNORE CVE-2024-54133"
             # Skip CVE on ActiveStorage as it is not used
-            IGNORE="$IGNORE CVE-2025-24293"
+            IGNORE="$IGNORE CVE-2025-24293 CVE-2026-33658"
             # Skip CVE on ActiveRecord < 7.1 as it affects only find done in terminal
             IGNORE="$IGNORE CVE-2025-55193"
             # Ignore Devise 4 CVE while we upgrade all platforms (to be removed)
