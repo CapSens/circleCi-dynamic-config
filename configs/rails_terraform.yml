@@ -250,7 +250,7 @@ jobs:
           PGHOST: localhost
           PGUSER: << pipeline.parameters.project-name >>
           RAILS_ENV: test
-      - image: redis:6.2-alpine
+      - image: redis:7.2-alpine
       - image: postgres:<< pipeline.parameters.pg-image-version >>-alpine
         environment:
           POSTGRES_USER: << pipeline.parameters.project-name >>
