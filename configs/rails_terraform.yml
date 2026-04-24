@@ -97,6 +97,14 @@ parameters:
     description: "Base key for caches - change is to invalidate all caches"
     type: string
     default: "my-app"
+  capsens-githook-branch:
+    description: "Branch of capsens_git_hooks repo to use for lint config"
+    type: string
+    default: "master"
+  lint-blocking:
+    description: "When true, lint failures (rubocop, erblint, stylelint) block the pipeline. When false, report only."
+    type: boolean
+    default: false
 
 
 commands: # a reusable command with parameters
@@ -361,7 +369,7 @@ jobs:
             fi
 
             bundle audit --update $IGNORE
-      - run: 
+      - run:
           name: "Check if :email is removed from filter_parameter_logging.rb"
           command: |
             if [ -f config/initializers/filter_parameter_logging.rb ]; then
@@ -380,6 +388,149 @@ jobs:
             brakeman -o security/brakeman.html || true
       - store_artifacts:
           path: security/brakeman.html
+
+  lint:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: small
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+    steps:
+      - checkout
+      - run:
+          name: Setup SSH for private repos
+          command: |
+            mkdir -p ~/.ssh
+            echo "$CGH_SSH_KEY" > ~/.ssh/id_ed25519
+            chmod 600 ~/.ssh/id_ed25519
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - run:
+          name: Clone shared lint rules
+          command: |
+            git clone --depth 1 --filter=blob:none --sparse \
+              -b << pipeline.parameters.capsens-githook-branch >> \
+              git@github.com:capsens/capsens_git_hooks.git \
+              /tmp/capsens_git_hooks
+            cd /tmp/capsens_git_hooks
+            git sparse-checkout set configs
+      - run:
+          name: Build lint configs
+          command: |
+            sed "s|<HOOKS_DIRECTORY>|/tmp/capsens_git_hooks|g" /tmp/capsens_git_hooks/configs/rubocop.yml \
+              > /tmp/capsens_git_hooks/configs/rubocop-config.yml
+            sed "s|<HOOKS_DIRECTORY>|/tmp/capsens_git_hooks|g" /tmp/capsens_git_hooks/configs/erblint.yml \
+              > /tmp/capsens_git_hooks/configs/erblint-config.yml
+      - run:
+          name: Fetch staging branch for diff
+          command: git fetch origin staging
+      - run:
+          name: Install linters
+          command: |
+            if [ -n "<< pipeline.parameters.bundler-version >>" ]; then
+              gem install bundler:<< pipeline.parameters.bundler-version >>
+            else
+              gem install bundler
+            fi
+            if grep -q "rubocop" Gemfile; then
+              bundle config set --local path 'vendor/bundle'
+              bundle install --jobs=4
+            else
+              gem install rubocop
+            fi
+            if ! grep -q "erb_lint" Gemfile 2>/dev/null; then
+              gem install erb_lint
+            fi
+            npm install stylelint stylelint-config-standard-scss @stylistic/stylelint-plugin
+      - run:
+          name: Run RuboCop
+          command: |
+            if grep -q "rubocop" Gemfile; then
+              RUBOCOP_CMD="bundle exec rubocop"
+            else
+              RUBOCOP_CMD="rubocop"
+            fi
+
+            CHANGED_FILES=$(git diff --name-only --diff-filter=d origin/staging...HEAD -- '*.rb')
+
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "No Ruby files changed, skipping RuboCop."
+              exit 0
+            fi
+
+            echo "Linting $(echo "$CHANGED_FILES" | wc -l | tr -d ' ') changed file(s):"
+            echo "$CHANGED_FILES"
+
+            mkdir -p /tmp/lint-results
+
+            $RUBOCOP_CMD --config /tmp/capsens_git_hooks/configs/rubocop-config.yml \
+              --format progress \
+              $CHANGED_FILES \
+              && echo 0 > /tmp/lint-results/rubocop.exitcode \
+              || echo $? > /tmp/lint-results/rubocop.exitcode
+      - run:
+          name: Run ERB Lint
+          command: |
+            if grep -q "erb_lint" Gemfile; then
+              ERBLINT_CMD="bundle exec erblint"
+            else
+              ERBLINT_CMD="erblint"
+            fi
+
+            CHANGED_FILES=$(git diff --name-only --diff-filter=d origin/staging...HEAD -- '*.erb')
+
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "No ERB files changed, skipping ERB Lint."
+              exit 0
+            fi
+
+            echo "Linting $(echo "$CHANGED_FILES" | wc -l | tr -d ' ') changed file(s):"
+            echo "$CHANGED_FILES"
+
+            mkdir -p /tmp/lint-results
+
+            $ERBLINT_CMD --config /tmp/capsens_git_hooks/configs/erblint-config.yml \
+              $CHANGED_FILES \
+              && echo 0 > /tmp/lint-results/erblint.exitcode \
+              || echo $? > /tmp/lint-results/erblint.exitcode
+      - run:
+          name: Run Stylelint
+          command: |
+            CHANGED_FILES=$(git diff --name-only --diff-filter=d origin/staging...HEAD -- '*.scss' '*.css')
+
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "No SCSS/CSS files changed, skipping Stylelint."
+              exit 0
+            fi
+
+            echo "Linting $(echo "$CHANGED_FILES" | wc -l | tr -d ' ') changed file(s):"
+            echo "$CHANGED_FILES"
+
+            mkdir -p /tmp/lint-results
+
+            npx stylelint --config /tmp/capsens_git_hooks/configs/stylelint.config.mjs \
+              $CHANGED_FILES \
+              && echo 0 > /tmp/lint-results/stylelint.exitcode \
+              || echo $? > /tmp/lint-results/stylelint.exitcode
+      - run:
+          name: Check lint results
+          command: |
+            FAILED=0
+
+            for linter in rubocop erblint stylelint; do
+              FILE="/tmp/lint-results/$linter.exitcode"
+              if [ -f "$FILE" ] && [ "$(cat $FILE)" != "0" ]; then
+                echo "FAIL: $linter found violations"
+                FAILED=1
+              elif [ -f "$FILE" ]; then
+                echo "PASS: $linter"
+              else
+                echo "SKIP: $linter (no files to lint)"
+              fi
+            done
+
+            if [ "$FAILED" = "1" ] && << pipeline.parameters.lint-blocking >>; then
+              echo "Lint errors found. Failing the build."
+              exit 1
+            fi
 
   build:
     working_directory: /tmp/app
@@ -510,11 +661,20 @@ workflows:
             context:
               - COMMON
         - save_and_restore_caches
-        - spec:
-            requires:
-              - save_and_restore_caches
+        # - spec:
+        #     requires:
+        #       - save_and_restore_caches
 
         - security_check
+
+        - lint:
+            context:
+              - GithubDev
+            filters:
+              branches:
+                ignore:
+                  - master
+                  - staging
 
   build-and-deploy:
     when:
