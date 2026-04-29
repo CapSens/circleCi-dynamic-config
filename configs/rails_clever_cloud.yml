@@ -225,8 +225,8 @@ jobs:
       - restore_cache:
           name: "restore bundler cache"
           keys:
-            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
-            - << pipeline.parameters.caches-base-key >>-bundler
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
       - run:
           name: Bundle install
           command: |
