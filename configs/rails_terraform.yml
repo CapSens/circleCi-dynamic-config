@@ -313,8 +313,63 @@ jobs:
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
 
+      - run:
+          name: Stash coverage results
+          when: always
+          command: |
+            mkdir -p coverage_results/${CIRCLE_NODE_INDEX}
+            if [ -f coverage/.resultset.json ]; then
+              mv coverage/.resultset.json coverage_results/${CIRCLE_NODE_INDEX}/.resultset.json
+            fi
+      - persist_to_workspace:
+          root: .
+          paths:
+            - coverage_results
       - store_test_results:
           path: /tmp/test-results
+
+  coverage_report:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: small
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          RAILS_ENV: test
+    steps:
+      - checkout
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-bundler
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - attach_workspace:
+          at: .
+      - run:
+          name: Collate SimpleCov results
+          command: |
+            if ! find coverage_results -name '.resultset.json' 2>/dev/null | grep -q .; then
+              echo "No SimpleCov results found, skipping."
+              exit 0
+            fi
+            if ! bundle info simplecov > /dev/null 2>&1; then
+              echo "SimpleCov not in bundle, skipping."
+              exit 0
+            fi
+            cat > /tmp/collate.rb <<'RUBY'
+            require "simplecov"
+            SimpleCov.collate Dir["coverage_results/**/.resultset.json"] do
+              formatter SimpleCov::Formatter::HTMLFormatter
+            end
+            RUBY
+            bundle exec ruby /tmp/collate.rb
+      - store_artifacts:
+          path: coverage
+          destination: coverage
 
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -513,6 +568,9 @@ workflows:
         - spec:
             requires:
               - save_and_restore_caches
+        - coverage_report:
+            requires:
+              - spec
 
         - security_check
 
