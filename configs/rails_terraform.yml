@@ -6,7 +6,8 @@ orbs:
 
 parameters:
   action:
-    description: "worflow to trigger. must be in [tests, build-and-deploy, deploy, undeploy]"
+    description: "worflow to trigger. must be in [tests, build-and-deploy, deploy,
+      undeploy]"
     type: string
     default: "tests"
   project-name:
@@ -33,7 +34,8 @@ parameters:
     type: string
     default: ""
   db-adapter-for-build:
-    description: "Use nulldb (activerecord-nulldb-adapter gem) for apps that needs to connect to database on initialization"
+    description: "Use nulldb (activerecord-nulldb-adapter gem) for apps that needs
+      to connect to database on initialization"
     type: string
     default: "postgresql"
   required-variables:
@@ -55,7 +57,8 @@ parameters:
     type: string
     default: ""
   pip-packages:
-    description: "space separated list of pip packages to install (usefull for apps using pycall - ifu_generator)"
+    description: "space separated list of pip packages to install (usefull for apps
+      using pycall - ifu_generator)"
     type: string
     default: ""
   tests-parallelism:
@@ -65,7 +68,8 @@ parameters:
     description: "Allow usage of difference resource class to reduce costs"
     type: string
     default: "medium"
-  assets-resource-class: # platforms with webpacker needs a bigger instance than small
+  assets-resource-class:
+    # platforms with webpacker needs a bigger instance than small
     description: "Allow usage of difference resource class for assets compilation"
     type: string
     default: "small"
@@ -86,7 +90,8 @@ parameters:
     type: string
     default: ""
   use-docker-cache:
-    description: "use docker cache. Set to false to force rebuild of all layers in the docker image"
+    description: "use docker cache. Set to false to force rebuild of all layers in
+      the docker image"
     type: boolean
     default: true
   pg-image-version:
@@ -98,8 +103,8 @@ parameters:
     type: string
     default: "my-app"
 
-
-commands: # a reusable command with parameters
+commands:
+  # a reusable command with parameters
   setup_env:
     steps:
       - checkout
@@ -214,7 +219,8 @@ jobs:
       - restore_cache:
           name: "restore bundler cache"
           keys:
-            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum
+              "Gemfile.lock" }}-1
             - << pipeline.parameters.caches-base-key >>-bundler
       - run:
           name: Bundle install
@@ -223,13 +229,15 @@ jobs:
             bundle install
       - save_cache:
           name: "save bundler cache"
-          key: << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
+          key: << pipeline.parameters.caches-base-key >>-bundler-{{ checksum
+            "Gemfile.lock" }}-1
           paths:
-              - vendor/bundle
+            - vendor/bundle
       - restore_cache:
           name: "restore yarn cache"
           keys:
-            - << pipeline.parameters.caches-base-key >>-yarn-{{ checksum "yarn.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-yarn-{{ checksum
+              "yarn.lock" }}-1
             - << pipeline.parameters.caches-base-key >>-yarn-
       - run:
           name: Yarn install
@@ -237,9 +245,10 @@ jobs:
             yarn install || true
       - save_cache:
           name: "save yarn cache"
-          key: << pipeline.parameters.caches-base-key >>-yarn-{{ checksum "Gemfile.lock" }}-1
+          key: << pipeline.parameters.caches-base-key >>-yarn-{{ checksum "Gemfile.lock"
+            }}-1
           paths:
-              - node_modules
+            - node_modules
 
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -271,12 +280,14 @@ jobs:
       - restore_cache:
           name: "restore bundler cache"
           keys:
-            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum
+              "Gemfile.lock" }}-1
             - << pipeline.parameters.caches-base-key >>-bundler
       - restore_cache:
           name: "restore yarn cache"
           keys:
-            - << pipeline.parameters.caches-base-key >>-yarn-{{ checksum "yarn.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-yarn-{{ checksum
+              "yarn.lock" }}-1
             - << pipeline.parameters.caches-base-key >>-yarn-
       - run:
           name: Bundle install
@@ -325,6 +336,9 @@ jobs:
           root: .
           paths:
             - coverage_results
+      - store_artifacts:
+          path: coverage/summary.json
+          destination: coverage/summary.json
       - store_test_results:
           path: /tmp/test-results
 
@@ -340,7 +354,8 @@ jobs:
       - restore_cache:
           name: "restore bundler cache"
           keys:
-            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum "Gemfile.lock" }}-1
+            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum
+              "Gemfile.lock" }}-1
             - << pipeline.parameters.caches-base-key >>-bundler
       - run:
           name: Bundle install
@@ -362,8 +377,16 @@ jobs:
             fi
             cat > /tmp/collate.rb \<<'RUBY'
             require "simplecov"
+            require "simplecov_json_formatter"
+            $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
+            require "simple_cov_summary_formatter"
+
             SimpleCov.collate Dir["coverage_results/**/.resultset.json"] do
-              formatter SimpleCov::Formatter::HTMLFormatter
+              formatter SimpleCov::Formatter::MultiFormatter.new([
+                SimpleCov::Formatter::HTMLFormatter,
+                SimpleCov::Formatter::JSONFormatter,
+                SimpleCovSummaryFormatter
+              ])
             end
             RUBY
             bundle exec ruby /tmp/collate.rb
@@ -416,7 +439,7 @@ jobs:
             fi
 
             bundle audit --update $IGNORE
-      - run: 
+      - run:
           name: "Check if :email is removed from filter_parameter_logging.rb"
           command: |
             if [ -f config/initializers/filter_parameter_logging.rb ]; then
@@ -537,7 +560,6 @@ jobs:
             echo "### END CONTAINERS STDOUT ###"
           when: on_fail
 
-
   undeploy:
     working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
@@ -558,53 +580,53 @@ workflows:
 
   workflow:
     when:
-      equal: [ tests, << pipeline.parameters.action >> ]
+      equal: [tests, << pipeline.parameters.action >>]
 
     jobs:
-        - auto_cancel_redundant_workflows:
-            context:
-              - COMMON
-        - save_and_restore_caches
-        - spec:
-            requires:
-              - save_and_restore_caches
-        - coverage_report:
-            requires:
-              - spec
+      - auto_cancel_redundant_workflows:
+          context:
+            - COMMON
+      - save_and_restore_caches
+      - spec:
+          requires:
+            - save_and_restore_caches
+      - coverage_report:
+          requires:
+            - spec
 
-        - security_check
+      - security_check
 
   build-and-deploy:
     when:
-      equal: [ build-and-deploy, << pipeline.parameters.action >> ]
+      equal: [build-and-deploy, << pipeline.parameters.action >>]
 
     jobs:
-        - build:
-            context:
-              - GithubDev
-              - AWS_ECR
-        - deploy:
-            requires:
-              - build
-            context:
-              - GithubDev
-              - AWS_ECR
+      - build:
+          context:
+            - GithubDev
+            - AWS_ECR
+      - deploy:
+          requires:
+            - build
+          context:
+            - GithubDev
+            - AWS_ECR
 
   deploy:
     when:
-      equal: [ deploy, << pipeline.parameters.action >> ]
+      equal: [deploy, << pipeline.parameters.action >>]
 
     jobs:
-        - deploy:
-            context:
-              - GithubDev
-              - AWS_ECR
+      - deploy:
+          context:
+            - GithubDev
+            - AWS_ECR
 
   undeploy:
     when:
-      equal: [ undeploy, << pipeline.parameters.action >> ]
+      equal: [undeploy, << pipeline.parameters.action >>]
     jobs:
-        - undeploy:
-            context:
-                - GithubDev
-                - AWS_ECR
+      - undeploy:
+          context:
+            - GithubDev
+            - AWS_ECR
