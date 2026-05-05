@@ -6,7 +6,8 @@ orbs:
 
 parameters:
   action:
-    description: "worflow to trigger. must be in [tests, build-and-deploy, deploy, undeploy]"
+    description: "worflow to trigger. must be in [tests, build-and-deploy, deploy,
+      undeploy]"
     type: string
     default: "tests"
   project-name:
@@ -33,7 +34,8 @@ parameters:
     type: string
     default: ""
   db-adapter-for-build:
-    description: "Use nulldb (activerecord-nulldb-adapter gem) for apps that needs to connect to database on initialization"
+    description: "Use nulldb (activerecord-nulldb-adapter gem) for apps that needs
+      to connect to database on initialization"
     type: string
     default: "postgresql"
   required-variables:
@@ -55,7 +57,8 @@ parameters:
     type: string
     default: ""
   pip-packages:
-    description: "space separated list of pip packages to install (usefull for apps using pycall - ifu_generator)"
+    description: "space separated list of pip packages to install (usefull for apps
+      using pycall - ifu_generator)"
     type: string
     default: ""
   tests-parallelism:
@@ -65,7 +68,8 @@ parameters:
     description: "Allow usage of difference resource class to reduce costs"
     type: string
     default: "medium"
-  assets-resource-class: # platforms with webpacker needs a bigger instance than small
+  assets-resource-class:
+    # platforms with webpacker needs a bigger instance than small
     description: "Allow usage of difference resource class for assets compilation"
     type: string
     default: "small"
@@ -86,11 +90,13 @@ parameters:
     type: string
     default: ""
   use-docker-cache:
-    description: "use docker cache. Set to false to force rebuild of all layers in the docker image"
+    description: "use docker cache. Set to false to force rebuild of all layers in
+      the docker image"
     type: boolean
     default: true
 
-commands: # a reusable command with parameters
+commands:
+  # a reusable command with parameters
   setup_env:
     steps:
       - checkout
@@ -216,7 +222,7 @@ jobs:
           name: "save bundler cache"
           key: my-app-bundler-{{ checksum "Gemfile.lock" }}-1
           paths:
-              - vendor/bundle
+            - vendor/bundle
       - restore_cache:
           name: "restore yarn cache"
           keys:
@@ -230,7 +236,7 @@ jobs:
           name: "save yarn cache"
           key: my-app-yarn-{{ checksum "Gemfile.lock" }}-1
           paths:
-              - node_modules
+            - node_modules
 
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -304,8 +310,68 @@ jobs:
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
 
+      - run:
+          name: Stash coverage results
+          when: always
+          command: |
+            mkdir -p coverage_results/${CIRCLE_NODE_INDEX}
+            if [ -f coverage/.resultset.json ]; then
+              mv coverage/.resultset.json coverage_results/${CIRCLE_NODE_INDEX}/.resultset.json
+            fi
+      - persist_to_workspace:
+          root: .
+          paths:
+            - coverage_results
+      - store_artifacts:
+          path: coverage/summary.json
+          destination: coverage/summary.json
       - store_test_results:
           path: /tmp/test-results
+
+  coverage_report:
+    working_directory: ~/<< pipeline.parameters.project-name >>
+    resource_class: small
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          RAILS_ENV: test
+    steps:
+      - checkout
+      - restore_cache:
+          name: "restore bundler cache"
+          keys:
+            - my-app-bundler-{{ checksum "Gemfile.lock" }}-1
+            - my-app-bundler
+      - run:
+          name: Bundle install
+          command: |
+            bundle config set --local path 'vendor/bundle'
+            bundle install
+      - attach_workspace:
+          at: .
+      - run:
+          name: Collate SimpleCov results
+          command: |
+            if ! find coverage_results -name '.resultset.json' 2>/dev/null | grep -q .; then
+              echo "No SimpleCov results found, skipping."
+              exit 0
+            fi
+            if ! bundle info simplecov > /dev/null 2>&1; then
+              echo "SimpleCov not in bundle, skipping."
+              exit 0
+            fi
+            cat > /tmp/collate.rb \<<'RUBY'
+            require "simplecov"
+            require "simplecov_json_formatter"
+            $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
+            require "simplecov_profile"
+
+            SimpleCov.collate Dir["coverage_results/**/.resultset.json"], "app"
+            RUBY
+            bundle exec ruby /tmp/collate.rb
+      - store_artifacts:
+          path: coverage
+          destination: coverage
 
   security_check:
     working_directory: ~/<< pipeline.parameters.project-name >>
@@ -350,7 +416,7 @@ jobs:
             fi
 
             bundle audit --update $IGNORE
-      - run: 
+      - run:
           name: "Check if :email is removed from filter_parameter_logging.rb"
           command: |
             if [ -f config/initializers/filter_parameter_logging.rb ]; then
@@ -470,7 +536,6 @@ jobs:
             echo "### END CONTAINERS STDOUT ###"
           when: on_fail
 
-
   undeploy:
     working_directory: ~/<< pipeline.parameters.project-name >>
     docker:
@@ -490,50 +555,53 @@ workflows:
 
   workflow:
     when:
-      equal: [ tests, << pipeline.parameters.action >> ]
+      equal: [tests, << pipeline.parameters.action >>]
 
     jobs:
-        - auto_cancel_redundant_workflows:
-            context:
-              - COMMON
-        - save_and_restore_caches
-        - spec:
-            requires:
-              - save_and_restore_caches
+      - auto_cancel_redundant_workflows:
+          context:
+            - COMMON
+      - save_and_restore_caches
+      - spec:
+          requires:
+            - save_and_restore_caches
+      - coverage_report:
+          requires:
+            - spec
 
-        - security_check
+      - security_check
 
   build-and-deploy:
     when:
-      equal: [ build-and-deploy, << pipeline.parameters.action >> ]
+      equal: [build-and-deploy, << pipeline.parameters.action >>]
 
     jobs:
-        - build:
-            context:
-              - GithubDev
-              - AWS_ECR
-        - deploy:
-            requires:
-              - build
-            context:
-              - GithubDev
-              - AWS_ECR
+      - build:
+          context:
+            - GithubDev
+            - AWS_ECR
+      - deploy:
+          requires:
+            - build
+          context:
+            - GithubDev
+            - AWS_ECR
 
   deploy:
     when:
-      equal: [ deploy, << pipeline.parameters.action >> ]
+      equal: [deploy, << pipeline.parameters.action >>]
 
     jobs:
-        - deploy:
-            context:
-              - GithubDev
-              - AWS_ECR
+      - deploy:
+          context:
+            - GithubDev
+            - AWS_ECR
 
   undeploy:
     when:
-      equal: [ undeploy, << pipeline.parameters.action >> ]
+      equal: [undeploy, << pipeline.parameters.action >>]
     jobs:
-        - undeploy:
-            context:
-                - GithubDev
-                - AWS_ECR
+      - undeploy:
+          context:
+            - GithubDev
+            - AWS_ECR
