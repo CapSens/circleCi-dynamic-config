@@ -364,15 +364,9 @@ jobs:
             require "simplecov"
             require "simplecov_json_formatter"
             $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
-            require "simple_cov_summary_formatter"
+            require "simplecov_profile"
 
-            SimpleCov.collate Dir["coverage_results/**/.resultset.json"] do
-              formatter SimpleCov::Formatter::MultiFormatter.new([
-                SimpleCov::Formatter::HTMLFormatter,
-                SimpleCov::Formatter::JSONFormatter,
-                SimpleCovSummaryFormatter
-              ])
-            end
+            SimpleCov.collate Dir["coverage_results/**/.resultset.json"], "app"
             RUBY
             bundle exec ruby /tmp/collate.rb
       - store_artifacts:
