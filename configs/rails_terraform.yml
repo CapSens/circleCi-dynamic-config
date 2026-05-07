@@ -396,6 +396,12 @@ jobs:
             cp -R dynamic_configs/.dockerdev ./
             rm -rf dynamic_configs
       - run:
+          name: Append project-local build env (if any)
+          command: |
+            if [ -f .circleci/.docker-build.env ]; then
+              cat .circleci/.docker-build.env >> .dockerdev/.env
+            fi
+      - run:
           name: Add file with git current revision
           command: |
             echo "${CIRCLE_SHA1}" > ./.current_revision.txt
