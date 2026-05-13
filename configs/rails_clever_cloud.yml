@@ -216,7 +216,7 @@ jobs:
               bundle install
             fi
 
-            cat > /tmp/simplecov_boot.rb <<'RUBY'
+            cat > /tmp/simplecov_boot.rb \<<'RUBY'
             return if defined?(SimpleCov) && SimpleCov.running
 
             $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
@@ -299,7 +299,7 @@ jobs:
               echo "SimpleCov not in bundle, skipping."
               exit 0
             fi
-            cat > /tmp/collate.rb <<'RUBY'
+            cat > /tmp/collate.rb \<<'RUBY'
             begin
               $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
               begin
