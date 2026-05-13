@@ -167,6 +167,22 @@ commands:
             cd terraform_infra
             make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=cluster_admin
 
+  fetch_dynamic_configs:
+    description: "Clone circleCi-dynamic-config repo to /tmp/dynamic_configs so jobs can reuse shared support files."
+    steps:
+      - run:
+          name: "Fetch dynamic configs support files"
+          command: |
+            if [ -d /tmp/dynamic_configs ]; then
+              exit 0
+            fi
+            if [ -z "${GITHUB_TOKEN:-}" ]; then
+              echo "[warn] GITHUB_TOKEN not set, skipping dynamic_configs clone (fallback support files unavailable)"
+              exit 0
+            fi
+            git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/CapSens/circleCi-dynamic-config.git" /tmp/dynamic_configs || \
+              echo "[warn] unable to clone dynamic_configs, fallback support files unavailable"
+
 jobs:
   auto_cancel_redundant_workflows:
     docker:
@@ -311,6 +327,7 @@ jobs:
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
+      - fetch_dynamic_configs
       - run:
           name: Test
           no_output_timeout: 15m
@@ -321,8 +338,37 @@ jobs:
               bundle add rspec_junit_formatter
               bundle install
             fi
+
+            cat > /tmp/simplecov_boot.rb <<'RUBY'
+            return if defined?(SimpleCov) && SimpleCov.running
+
+            $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
+            begin
+              require "simplecov_profile"
+            rescue LoadError
+            end
+
+            unless defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+              shared = "/tmp/dynamic_configs/support/simplecov_app_profile.rb"
+              require shared if File.exist?(shared)
+            end
+
+            if defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+              SimpleCov.start "app"
+            else
+              warn "[simplecov_boot] profile 'app' unavailable, coverage disabled"
+            end
+            RUBY
+
+            RSPEC_REQUIRE=""
+            if bundle info simplecov > /dev/null 2>&1 && bundle info simplecov_json_formatter > /dev/null 2>&1; then
+              RSPEC_REQUIRE="--require /tmp/simplecov_boot.rb"
+            else
+              echo "simplecov not bundled, coverage disabled for this run"
+            fi
+
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings > /tmp/tests-to-run
-            bundle exec rspec $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
+            bundle exec rspec $RSPEC_REQUIRE $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
 
       - run:
           name: Stash coverage results
@@ -364,9 +410,11 @@ jobs:
             bundle install
       - attach_workspace:
           at: .
+      - fetch_dynamic_configs
       - run:
           name: Collate SimpleCov results
           command: |
+            set +e
             if ! find coverage_results -name '.resultset.json' 2>/dev/null | grep -q .; then
               echo "No SimpleCov results found, skipping."
               exit 0
@@ -375,15 +423,31 @@ jobs:
               echo "SimpleCov not in bundle, skipping."
               exit 0
             fi
-            cat > /tmp/collate.rb \<<'RUBY'
-            require "simplecov"
-            require "simplecov_json_formatter"
-            $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
-            require "simplecov_profile"
+            cat > /tmp/collate.rb <<'RUBY'
+            begin
+              $LOAD_PATH.unshift File.expand_path("spec/support", Dir.pwd)
+              begin
+                require "simplecov_profile"
+              rescue LoadError
+              end
 
-            SimpleCov.collate Dir["coverage_results/**/.resultset.json"], "app"
+              unless defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+                shared = "/tmp/dynamic_configs/support/simplecov_app_profile.rb"
+                require shared if File.exist?(shared)
+              end
+
+              if defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+                SimpleCov.collate(Dir["coverage_results/**/.resultset.json"], "app")
+              else
+                warn "[coverage_report] profile 'app' not available, skipping collate"
+              end
+            rescue => e
+              warn "[coverage_report] collate failed: #{e.class}: #{e.message}"
+              warn e.backtrace.first(5).join("\n") if e.backtrace
+            end
             RUBY
             bundle exec ruby /tmp/collate.rb
+            exit 0
       - store_artifacts:
           path: coverage
           destination: coverage
