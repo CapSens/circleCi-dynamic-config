@@ -168,11 +168,7 @@ commands:
             if [ -d /tmp/dynamic_configs ]; then
               exit 0
             fi
-            if [ -z "${GITHUB_TOKEN:-}" ]; then
-              echo "[warn] GITHUB_TOKEN not set, skipping dynamic_configs clone (fallback support files unavailable)"
-              exit 0
-            fi
-            git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/CapSens/circleCi-dynamic-config.git" /tmp/dynamic_configs || \
+            git clone --depth 1 https://github.com/CapSens/circleCi-dynamic-config.git /tmp/dynamic_configs || \
               echo "[warn] unable to clone dynamic_configs, fallback support files unavailable"
 
 jobs:
