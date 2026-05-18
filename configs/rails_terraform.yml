@@ -344,12 +344,12 @@ jobs:
             rescue LoadError
             end
 
-            unless defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+            unless defined?(SimpleCov) && SimpleCov.profiles.key?(:app)
               shared = "/tmp/dynamic_configs/support/simplecov_app_profile.rb"
               require shared if File.exist?(shared)
             end
 
-            if defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+            if defined?(SimpleCov) && SimpleCov.profiles.key?(:app)
               SimpleCov.start "app"
             else
               warn "[simplecov_boot] profile 'app' unavailable, coverage disabled"
@@ -427,12 +427,12 @@ jobs:
               rescue LoadError
               end
 
-              unless defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+              unless defined?(SimpleCov) && SimpleCov.profiles.key?(:app)
                 shared = "/tmp/dynamic_configs/support/simplecov_app_profile.rb"
                 require shared if File.exist?(shared)
               end
 
-              if defined?(SimpleCov) && SimpleCov.profiles.key?("app")
+              if defined?(SimpleCov) && SimpleCov.profiles.key?(:app)
                 SimpleCov.collate(Dir["coverage_results/**/.resultset.json"], "app")
               else
                 warn "[coverage_report] profile 'app' not available, skipping collate"

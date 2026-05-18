@@ -24,7 +24,7 @@ unless defined?(SimpleCovSummaryFormatter)
   end
 end
 
-unless SimpleCov.profiles.key?("app")
+unless SimpleCov.profiles.key?(:app)
   SimpleCov.profiles.define "app" do
     load_profile "rails"
     enable_coverage :branch
