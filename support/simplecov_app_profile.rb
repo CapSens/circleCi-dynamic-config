@@ -10,12 +10,18 @@ unless defined?(SimpleCovSummaryFormatter)
         covered_lines: result.covered_lines,
         total_lines: result.total_lines,
         covered_strength: result.covered_strength,
+        covered_branches: result.covered_branches,
+        total_branches: result.total_branches,
+        branch_covered_percent: result.branch_covered_percent,
         groups: result.groups.transform_values { |files|
           {
             covered_percent: files.covered_percent,
             covered_lines: files.covered_lines,
             total_lines: files.lines_of_code,
-            covered_strength: files.covered_strength
+            covered_strength: files.covered_strength,
+            covered_branches: files.covered_branches,
+            total_branches: files.total_branches,
+            branch_covered_percent: files.branch_covered_percent
           }
         }
       }
