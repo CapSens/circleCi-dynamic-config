@@ -388,22 +388,14 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
     docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>
         environment:
           RAILS_ENV: test
     steps:
       - checkout
-      - restore_cache:
-          name: "restore bundler cache"
-          keys:
-            - << pipeline.parameters.caches-base-key >>-bundler-{{ checksum
-              "Gemfile.lock" }}-1
-            - << pipeline.parameters.caches-base-key >>-bundler
       - run:
-          name: Bundle install
-          command: |
-            bundle config set --local path 'vendor/bundle'
-            bundle install
+          name: Install SimpleCov for collate
+          command: gem install --no-doc simplecov simplecov_json_formatter
       - attach_workspace:
           at: .
       - fetch_dynamic_configs
@@ -415,8 +407,8 @@ jobs:
               echo "No SimpleCov results found, skipping."
               exit 0
             fi
-            if ! bundle info simplecov > /dev/null 2>&1; then
-              echo "SimpleCov not in bundle, skipping."
+            if ! gem list -i simplecov > /dev/null 2>&1; then
+              echo "SimpleCov not installed, skipping."
               exit 0
             fi
             cat > /tmp/collate.rb \<<'RUBY'
@@ -442,7 +434,7 @@ jobs:
               warn e.backtrace.first(5).join("\n") if e.backtrace
             end
             RUBY
-            bundle exec ruby /tmp/collate.rb
+            ruby /tmp/collate.rb
             exit 0
       - store_artifacts:
           path: coverage
