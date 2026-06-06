@@ -162,6 +162,18 @@ commands: # a reusable command with parameters
             cd terraform_infra
             make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=cluster_admin
 
+  fetch_dynamic_configs:
+    description: "Clone circleCi-dynamic-config repo to /tmp/dynamic_configs so jobs can reuse shared support files."
+    steps:
+      - run:
+          name: "Fetch dynamic configs support files"
+          command: |
+            if [ -d /tmp/dynamic_configs ]; then
+              exit 0
+            fi
+            git clone --depth 1 -b feat/add-simplecov-artifact https://github.com/CapSens/circleCi-dynamic-config.git /tmp/dynamic_configs || \
+              echo "[warn] unable to clone dynamic_configs, fallback support files unavailable"
+
 jobs:
   auto_cancel_redundant_workflows:
     docker:
@@ -300,6 +312,7 @@ jobs:
       - run:
           name: Database initialization
           command: bundle exec rake db:create db:migrate
+      - fetch_dynamic_configs
       - run:
           name: Test
           no_output_timeout: 15m
@@ -310,9 +323,30 @@ jobs:
               bundle add rspec_junit_formatter
               bundle install
             fi
+
+            if [ -f /tmp/dynamic_configs/support/dot_simplecov ] && [ ! -f .simplecov ] && bundle info simplecov > /dev/null 2>&1; then
+              cp /tmp/dynamic_configs/support/dot_simplecov .simplecov
+            else
+              echo "simplecov config unavailable, gem not bundled, or project .simplecov present; CI coverage config skipped"
+            fi
+
             circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
 
+      - run:
+          name: Stash coverage results
+          when: always
+          command: |
+            mkdir -p coverage_results/${CIRCLE_NODE_INDEX}
+            if [ -f coverage/.resultset.json ]; then
+              mv coverage/.resultset.json coverage_results/${CIRCLE_NODE_INDEX}/.resultset.json
+            fi
+            if [ -f coverage/groups.json ]; then
+              mv coverage/groups.json coverage_results/${CIRCLE_NODE_INDEX}/groups.json
+            fi
+      - store_artifacts:
+          path: coverage_results
+          destination: coverage_results
       - store_test_results:
           path: /tmp/test-results
 

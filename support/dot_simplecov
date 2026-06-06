@@ -1,0 +1,29 @@
+# Dropped at the project root as `.simplecov` by the CI. SimpleCov auto-loads it on
+# `require "simplecov"`, before the project's own SimpleCov.start, so branch coverage
+# and groups are enabled for that single start. Best-effort: never fails the suite.
+begin
+  require "json"
+
+  SimpleCov.configure do
+    enable_coverage :branch
+    load_profile "rails"
+    add_filter "/bin/"
+    add_group "Admin", "app/admin"
+    track_files "{app,lib}/**/*.rb"
+  end
+
+  SimpleCov.command_name "RSpec-#{ENV['CIRCLE_NODE_INDEX']}" if ENV["CIRCLE_NODE_INDEX"]
+
+  SimpleCov.at_exit do
+    SimpleCov.result.format!
+
+    begin
+      manifest = SimpleCov.result.groups.transform_values { |file_list| file_list.map(&:filename) }
+      File.write(File.join(SimpleCov.coverage_path, "groups.json"), JSON.generate(manifest))
+    rescue => e
+      warn "[.simplecov] groups manifest skipped: #{e.class}: #{e.message}"
+    end
+  end
+rescue => e
+  warn "[.simplecov] coverage config skipped: #{e.class}: #{e.message}"
+end

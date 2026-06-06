@@ -18,5 +18,18 @@ You can enable the tests parallelism by providing the `tests-parallelism` variab
 It will split the RSpec suite in X smaller pipelines that should really speed up the execution time if your project's tests are slow.
 Be careful, as it will spawn **real** containers. So, for example, if you set `tests-parallelism` to 3, each pipeline (commit) running on your project will effectively run 4 pipelines. That leaves that much less spots in the queue for your other projects and other pipelines to run. So, consider this option **ONLY** if this is worth it.
 
+## Coverage report
+
+The pipeline collects SimpleCov coverage during the `spec` job. Each parallel test container stores its raw `coverage/.resultset.json` as a CI artifact under `coverage_results/<CIRCLE_NODE_INDEX>/`; these are collated on the intra side to produce the final report.
+
+To enable it, add the gem and keep the usual `SimpleCov.start` in your test helper (`spec/spec_helper.rb`):
+
+```ruby
+group :test do
+  gem "simplecov", require: false
+end
+```
+
+The CI drops [`support/dot_simplecov`](support/dot_simplecov) at the project root as `.simplecov`, which SimpleCov auto-loads before `SimpleCov.start` to enable branch coverage and groups. Edit it to change the default for every project, or commit your own `.simplecov` to override it per project (the CI never overwrites an existing one).
 
 https://www.capsens.eu/
