@@ -2,6 +2,7 @@
 
 require 'bundler/setup'
 require 'uri'
+require 'set'
 
 # Detect which Redis gem is available
 # Sidekiq 7+ uses redis-client, older versions use redis
@@ -41,14 +42,18 @@ def main
   uri = URI.parse(redis_url)
   url = uri.path.match?(%r{^/\d+$}) ? redis_url : "#{redis_url.chomp('/')}/#{redis_db}"
 
+  # Queues to ignore when computing the scaling metric (e.g. throttled queues).
+  # Comma or space separated list, set via the SIDEKIQ_METRICS_EXCLUDED_QUEUES env var.
+  excluded_queues = ENV.fetch('SIDEKIQ_METRICS_EXCLUDED_QUEUES', '').split(/[,\s]+/).reject(&:empty?).to_set
+
   redis = create_redis_connection(url)
 
   loop do
     begin
-      # Get all Sidekiq queues
-      queues = redis_call(redis, 'SMEMBERS', 'queues')
+      # Get all Sidekiq queues, dropping the ones we explicitly exclude
+      queues = redis_call(redis, 'SMEMBERS', 'queues').reject { |queue| excluded_queues.include?(queue) }
 
-      # Calculate total jobs across all queues
+      # Calculate total jobs across the remaining queues
       total = queues.sum { |queue| redis_call(redis, 'LLEN', "queue:#{queue}").to_i }
 
       # Store as Redis list (KEDA reads list length)
@@ -59,7 +64,8 @@ def main
       end
       redis_call(redis, 'EXPIRE', 'sidekiq:metrics:total_jobs', 60)
 
-      puts "[#{Time.now}] Total: #{total} jobs across #{queues.size} queues (using #{REDIS_GEM})"
+      excluded_info = excluded_queues.empty? ? '' : " (excluded: #{excluded_queues.to_a.join(', ')})"
+      puts "[#{Time.now}] Total: #{total} jobs across #{queues.size} queues#{excluded_info} (using #{REDIS_GEM})"
     rescue => e
       puts "[#{Time.now}] Error: #{e.class} - #{e.message}"
     end

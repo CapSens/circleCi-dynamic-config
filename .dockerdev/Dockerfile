@@ -160,6 +160,7 @@ RUN yarn install --check-files
 # are listed with fake values in .dockerdev/env_variables.sh script and exported below
 RUN ( \
   source .dockerdev/.env \
+  && if [ -f .circleci/.docker-build.env ]; then source .circleci/.docker-build.env; fi \
   && env \
   && env_file_name=./config/environments/${RAILS_ENV}.rb \
   && echo 'Rails.application.config.require_master_key = false' >> $env_file_name \
