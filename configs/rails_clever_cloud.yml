@@ -222,12 +222,12 @@ jobs:
           name: Stash coverage results
           when: always
           command: |
-            mkdir -p coverage_results/${CIRCLE_NODE_INDEX}
+            mkdir -p coverage_results/${CIRCLE_NODE_INDEX:-0}
             if [ -f coverage/.resultset.json ]; then
-              mv coverage/.resultset.json coverage_results/${CIRCLE_NODE_INDEX}/.resultset.json
+              mv coverage/.resultset.json coverage_results/${CIRCLE_NODE_INDEX:-0}/.resultset.json
             fi
             if [ -f coverage/groups.json ]; then
-              mv coverage/groups.json coverage_results/${CIRCLE_NODE_INDEX}/groups.json
+              mv coverage/groups.json coverage_results/${CIRCLE_NODE_INDEX:-0}/groups.json
             fi
       - store_artifacts:
           path: coverage_results
