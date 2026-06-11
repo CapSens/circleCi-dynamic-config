@@ -162,7 +162,7 @@ commands: # a reusable command with parameters
             if [ -d /tmp/dynamic_configs ]; then
               exit 0
             fi
-            git clone --depth 1 -b feat/add-simplecov-artifact https://github.com/CapSens/circleCi-dynamic-config.git /tmp/dynamic_configs || \
+            git clone --depth 1 https://github.com/CapSens/circleCi-dynamic-config.git /tmp/dynamic_configs || \
               echo "[warn] unable to clone dynamic_configs, fallback support files unavailable"
 
 jobs:
