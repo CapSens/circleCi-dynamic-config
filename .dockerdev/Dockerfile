@@ -112,13 +112,18 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # Install NodeJS and NPM from Nodesource
 ARG NODE_MAJOR=21
+# éviter tout prompt de téléchargement en environnement non interactif.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN echo "Package: nodejs" >> /etc/apt/preferences.d/preferences \
   && echo "Pin: origin deb.nodesource.com" >> /etc/apt/preferences.d/preferences \
   && echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/preferences \
   && curl -sSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g yarn
+  && npm install -g corepack \
+  && corepack enable \
+  && corepack install -g yarn@4 \
+  && corepack install -g yarn@1
 
 ARG GITHUB_TOKEN
 # Then, we re-configure Bundler
@@ -153,7 +158,7 @@ ENV DB_ADAPTER=$DB_ADAPTER
 COPY .dockerdev/database.yml.template config/database.yml
 
 # Install JS packages
-RUN yarn install --check-files
+RUN yarn install --immutable
 
 # Precompile assets
 # NOTE: The app may require some environment variables (e.g., SECRET_KEY_BASE). All known mandatory variables
@@ -178,6 +183,8 @@ WORKDIR "/home/my_user/app"
 # Install NodeJS and NPM from Nodesource
 ARG NODE_MAJOR=21
 ARG FORCE_NODE=""
+# éviter tout prompt de téléchargement en environnement non interactif.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN test -n "$FORCE_NODE" \
   && echo "Package: nodejs" >> /etc/apt/preferences.d/preferences \
   && echo "Pin: origin deb.nodesource.com" >> /etc/apt/preferences.d/preferences \
@@ -185,7 +192,10 @@ RUN test -n "$FORCE_NODE" \
   && curl -sSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g yarn \
+  && npm install -g corepack \
+  && corepack enable \
+  && corepack install -g yarn@4 \
+  && corepack install -g yarn@1 \
   || echo "nodejs not mandatory for production environment"
 
 # Install 1Password CLI if "1password-cli" is in PACKAGES_TO_INSTALL
