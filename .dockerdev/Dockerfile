@@ -181,7 +181,7 @@ SHELL ["/bin/bash", "-c"]
 WORKDIR "/home/my_user/app"
 
 # Install NodeJS and NPM from Nodesource
-ARG NODE_MAJOR=21
+ARG NODE_MAJOR=22
 ARG FORCE_NODE=""
 # éviter tout prompt de téléchargement en environnement non interactif.
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
