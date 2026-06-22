@@ -57,3 +57,5 @@ config/initializers/letter_opener*.rb
 # Ignore env files
 .env*
 config/application.yml
+
+.claude/
