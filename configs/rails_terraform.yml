@@ -160,7 +160,7 @@ commands: # a reusable command with parameters
           name: Kubeconfig initialization
           command: |
             cd terraform_infra
-            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=cluster_admin
+            make kube_add workspace=<< pipeline.parameters.k8s-cluster >> aws_profile=deployer aws_iam_role=cluster_admin aws_region=${DEPLOY_AWS_REGION:-eu-west-1}
 
   fetch_dynamic_configs:
     description: "Clone circleCi-dynamic-config repo to /tmp/dynamic_configs so jobs can reuse shared support files."
