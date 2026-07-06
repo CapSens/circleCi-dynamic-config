@@ -379,6 +379,8 @@ jobs:
             IGNORE="$IGNORE CVE-2025-24293"
             # Skip CVE on ActiveRecord < 7.1 as it affects only find done in terminal
             IGNORE="$IGNORE CVE-2025-55193"
+            # Ignore WEBrick CVE while no patch is released yet (to be removed)
+            IGNORE="$IGNORE CVE-2026-38969"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi

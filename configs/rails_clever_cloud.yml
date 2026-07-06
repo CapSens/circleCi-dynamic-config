@@ -268,6 +268,8 @@ jobs:
             IGNORE="$IGNORE CVE-2024-54133"
             # Ignore Devise 4 CVE while we upgrade all platforms (to be removed)
             IGNORE="$IGNORE GHSA-57hq-95w6-v4fc"
+            # Ignore WEBrick CVE while no patch is released yet (to be removed)
+            IGNORE="$IGNORE CVE-2026-38969"
             if [ -n "$IGNORE" ]; then
               IGNORE="--ignore $IGNORE"
             fi
