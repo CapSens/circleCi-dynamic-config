@@ -214,6 +214,13 @@ jobs:
           RAILS_ENV: test
     steps:
       - setup_env
+      - run:
+          name: "Check for unresolved merge conflict markers"
+          command: |
+            if git --no-pager grep -nE '^([<]{7}|[>]{7}) '; then
+              echo "ERROR: unresolved merge conflict markers found in tracked files"
+              exit 1
+            fi
       - restore_cache:
           name: "restore bundler cache"
           keys:
