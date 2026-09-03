@@ -39,9 +39,14 @@ RUN echo "Package: nodejs" >> /etc/apt/preferences.d/preferences \
   && echo "Pin: origin deb.nodesource.com" >> /etc/apt/preferences.d/preferences \
   && echo "Pin-Priority: 1001" >> /etc/apt/preferences.d/preferences
 
+# éviter tout prompt de téléchargement en environnement non interactif.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
   && apt-get install -y --no-install-recommends nodejs \
-  && npm install -g yarn
+  && npm install -g corepack \
+  && corepack enable \
+  && corepack install -g yarn@4 \
+  && corepack install -g yarn@1
 
 # Configure bundler
 ENV LANG=C.UTF-8 \
