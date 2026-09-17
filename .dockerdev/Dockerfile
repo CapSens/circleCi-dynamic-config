@@ -17,6 +17,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   --mount=type=tmpfs,target=/var/log \
   rm -f /etc/apt/apt.conf.d/docker-clean; \
+  if [ "$DISTRO_NAME" = "bullseye" ]; then \
+    sed -i 's|^deb http://deb.debian.org/debian-security bullseye-security main|deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/20260901T000000Z bullseye-security main|' /etc/apt/sources.list; \
+  fi; \
   apt-get update -qq && \
   DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
   curl \
