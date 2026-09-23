@@ -181,6 +181,11 @@ RUN ( \
 FROM 1password/op:2 AS op-cli
 FROM base AS production
 SHELL ["/bin/bash", "-c"]
+
+# Run and own only the runtime files as a non-root user for security
+RUN groupadd --system --gid 1000 my_user && \
+    useradd my_user --uid 1000 --gid 1000 --no-create-home --home-dir /home/my_user --shell /bin/bash && \
+    install -d -o 1000 -g 1000 /home/my_user /home/my_user/app /home/my_user/app/tmp /home/my_user/app/log
 WORKDIR "/home/my_user/app"
 
 # Install NodeJS and NPM from Nodesource
@@ -222,19 +227,19 @@ RUN if command -v convert &> /dev/null; \
   fi
 
 # Copy application code
-COPY --exclude=Gemfile* . .
+COPY --exclude=Gemfile* --chown=1000:1000 . .
 
 # Configure Rails to allow public file server served by app server
 RUN sed -i 's/\(.*public_file_server\.enabled.*= \).*/\1true/' config/environments/${RAILS_ENV}.rb
 
 # Copy database config to avoid human errors
-COPY .dockerdev/database.yml.template /home/my_user/app/config/database.yml
+COPY --chown=1000:1000 .dockerdev/database.yml.template /home/my_user/app/config/database.yml
 # Copy letter_opener config to use it with S3
-COPY .dockerdev/letter_opener_config.rb /home/my_user/app/config/initializers/letter_opener.rb
+COPY --chown=1000:1000 .dockerdev/letter_opener_config.rb /home/my_user/app/config/initializers/letter_opener.rb
 # Copy preflight script that validate all app components works before deployment
 COPY .dockerdev/preflight.template /app/bin/preflight
 # Copy sidekiq_metrics script in order to run it as a sidecar container to enable keda autoscaling on background pods
-COPY .dockerdev/sidekiq_metrics.template /home/my_user/app/bin/sidekiq_metrics
+COPY --chown=1000:1000 .dockerdev/sidekiq_metrics.template /home/my_user/app/bin/sidekiq_metrics
 
 RUN chmod +x /app/bin/preflight /home/my_user/app/bin/sidekiq_metrics
 
@@ -242,21 +247,14 @@ RUN chmod +x /app/bin/preflight /home/my_user/app/bin/sidekiq_metrics
 # 1) Installed gems
 COPY --from=production-builder $BUNDLE_PATH $BUNDLE_PATH
 # 1bis) Gemfile.lock updated with platform x86_64-linux
-COPY --from=production-builder /rails/Gemfile* ./
+COPY --from=production-builder --chown=1000:1000 /rails/Gemfile* ./
 # 2) Compiled assets
-COPY --from=production-builder /rails/publi[c]/asset[s]/ ./public/assets
+COPY --from=production-builder --chown=1000:1000 /rails/publi[c]/asset[s]/ ./public/assets
 # pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
-COPY --from=production-builder /rails/publi[c]/pack[s]/ ./public/packs
+COPY --from=production-builder --chown=1000:1000 /rails/publi[c]/pack[s]/ ./public/packs
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
-COPY --from=production-builder /rails/tm[p]/cach[e]/bootsnap* ./tmp/cache/bootsnap
+COPY --from=production-builder --chown=1000:1000 /rails/tm[p]/cach[e]/bootsnap* ./tmp/cache/bootsnap
 
-# Force creation of tmp and log folders if not exists
-RUN mkdir -p /home/my_user/app/tmp /home/my_user/app/log
-
-# Run and own only the runtime files as a non-root user for security
-RUN groupadd --system --gid 1000 my_user && \
-    useradd my_user --uid 1000 --gid 1000 --create-home --shell /bin/bash && \
-    chown -R my_user:my_user /home/my_user
 USER 1000:1000
 
 EXPOSE 3000
