@@ -104,6 +104,16 @@ commands: # a reusable command with parameters
     steps:
       - checkout
       - run:
+          name: Private CapSens gems
+          # Gemfiles pull private CapSens gems over SSH (git_source :capsens),
+          # which the project's checkout key cannot read. Same rewrite as the
+          # Docker build, through GITHUB_TOKEN from the GithubDev context. The
+          # rewrite happens at fetch time: Gemfile.lock and caches keep git@.
+          command: |
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+              git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+            fi
+      - run:
           name: Database Config
           command: cp config/database.yml.ci config/database.yml
       - run:
@@ -545,8 +555,12 @@ workflows:
         - auto_cancel_redundant_workflows:
             context:
               - COMMON
-        - save_and_restore_caches
+        - save_and_restore_caches:
+            context:
+              - GithubDev
         - spec:
+            context:
+              - GithubDev
             requires:
               - save_and_restore_caches
 
