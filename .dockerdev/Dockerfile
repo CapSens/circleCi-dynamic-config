@@ -47,14 +47,9 @@ RUN if echo "$PACKAGES_TO_INSTALL" | grep -q "google-chrome-stable"; then \
     DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
     wget \
     fonts-liberation \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
     xdg-utils \
     && wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && dpkg -i google-chrome-stable_current_amd64.deb \
-    && apt-get install -f \
+    && apt-get install -yq --no-install-recommends ./google-chrome-stable_current_amd64.deb \
     && rm google-chrome-stable_current_amd64.deb \
     && rm -rf /var/lib/apt/lists/*; \
   fi
