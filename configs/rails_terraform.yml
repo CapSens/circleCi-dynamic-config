@@ -54,6 +54,10 @@ parameters:
   packages-for-tests:
     type: string
     default: ""
+  test-globs:
+    description: "space separated quoted globs of the spec files to run, e.g. for a modular app with packs"
+    type: string
+    default: '"spec/**/*_spec.rb"'
   pip-packages:
     description: "space separated list of pip packages to install (usefull for apps using pycall - ifu_generator)"
     type: string
@@ -330,7 +334,7 @@ jobs:
               echo "simplecov config unavailable, gem not bundled, or project .simplecov present; CI coverage config skipped"
             fi
 
-            circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings > /tmp/tests-to-run
+            circleci tests glob << pipeline.parameters.test-globs >> | circleci tests split --split-by=timings > /tmp/tests-to-run
             bundle exec rspec $(cat /tmp/tests-to-run) --format progress --format RspecJunitFormatter --out /tmp/test-results/rspec.xml
 
       - run:
