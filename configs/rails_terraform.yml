@@ -101,7 +101,51 @@ parameters:
     description: "Base key for caches - change is to invalidate all caches"
     type: string
     default: "my-app"
+  use-elasticsearch:
+    description: "Start an Elasticsearch container beside the specs. Set to false for an app that does not use it"
+    type: boolean
+    default: true
 
+
+executors:
+  spec-elasticsearch-true:
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+      - image: redis:7.2-alpine
+      - image: postgres:<< pipeline.parameters.pg-image-version >>-alpine
+        environment:
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+      - image: docker.elastic.co/elasticsearch/elasticsearch:6.7.0
+        environment:
+          - cluster.name: elasticsearch
+          - xpack.security.enabled: false
+          - transport.host: localhost
+          - network.host: 127.0.0.1
+          - http.port: 9200
+          - discovery.type: single-node
+  spec-elasticsearch-false:
+    resource_class: << pipeline.parameters.resource-class >>
+    docker:
+      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
+        environment:
+          PGHOST: localhost
+          PGUSER: << pipeline.parameters.project-name >>
+          RAILS_ENV: test
+      - image: redis:7.2-alpine
+      - image: postgres:<< pipeline.parameters.pg-image-version >>-alpine
+        environment:
+          POSTGRES_USER: << pipeline.parameters.project-name >>
+          POSTGRES_DB: << pipeline.parameters.project-name >>
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
 
 commands: # a reusable command with parameters
   setup_env:
@@ -259,28 +303,8 @@ jobs:
 
   spec:
     working_directory: ~/<< pipeline.parameters.project-name >>
-    resource_class: << pipeline.parameters.resource-class >>
-    docker:
-      - image: capsens/ruby-node-yarn:<< pipeline.parameters.ruby-version >>
-        environment:
-          PGHOST: localhost
-          PGUSER: << pipeline.parameters.project-name >>
-          RAILS_ENV: test
-      - image: redis:7.2-alpine
-      - image: postgres:<< pipeline.parameters.pg-image-version >>-alpine
-        environment:
-          POSTGRES_USER: << pipeline.parameters.project-name >>
-          POSTGRES_DB: << pipeline.parameters.project-name >>
-          POSTGRES_PASSWORD: ""
-          POSTGRES_HOST_AUTH_METHOD: trust
-      - image: docker.elastic.co/elasticsearch/elasticsearch:6.7.0
-        environment:
-          - cluster.name: elasticsearch
-          - xpack.security.enabled: false
-          - transport.host: localhost
-          - network.host: 127.0.0.1
-          - http.port: 9200
-          - discovery.type: single-node
+    # The boolean is written into the name: spec-elasticsearch-true or spec-elasticsearch-false.
+    executor: spec-elasticsearch-<< pipeline.parameters.use-elasticsearch >>
     parallelism: << pipeline.parameters.tests-parallelism >>
     steps:
       - setup_env
