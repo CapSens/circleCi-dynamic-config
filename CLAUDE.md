@@ -96,6 +96,7 @@ Terraform-specific parameters:
 - `k8s-cluster`: EKS cluster name (eks_staging uses "staging" branch of terraform-infra)
 - `workspace`: Terraform workspace name
 - `assets-bucket`: S3 bucket for compiled assets
+- `extra-public-paths`: Space-separated paths relative to `public/`, produced by the assets build, to copy into the Docker image besides `public/assets` and `public/packs` (e.g. `pdfjs` for pdf.js resources served by a fixed path). The build fails if a listed path is missing.
 
 ## Key Constraints
 

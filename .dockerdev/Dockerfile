@@ -176,6 +176,23 @@ RUN ( \
   && sed -i '$ d' $env_file_name \
 )
 
+# Build output under public/ that the production stage must carry, listed by
+# the project as space separated paths relative to public/. public/assets and
+# public/packs are always copied; this is for anything else a build script
+# writes there, e.g. files served by a fixed path that cannot go through the
+# asset digest. Staged in a dedicated folder because COPY cannot loop over a
+# build argument. A missing path fails the build rather than shipping a 404.
+ARG EXTRA_PUBLIC_PATHS=""
+RUN mkdir -p /extra_public \
+  && for path in $EXTRA_PUBLIC_PATHS; do \
+    if [ ! -e "public/$path" ]; then \
+      echo "EXTRA_PUBLIC_PATHS: public/$path does not exist after assets:precompile" >&2; \
+      exit 1; \
+    fi; \
+    mkdir -p "/extra_public/$(dirname "$path")" \
+    && cp -R "public/$path" "/extra_public/$path"; \
+  done
+
 # Finally, our production image definition
 # 1Password CLI: stage used to conditionally install `op` binary (see COPY --from=op-cli below)
 FROM 1password/op:2 AS op-cli
@@ -247,6 +264,8 @@ COPY --from=production-builder /rails/Gemfile* ./
 COPY --from=production-builder /rails/publi[c]/asset[s]/ ./public/assets
 # pack[s] is on purpose. Using glob pattern to avoid error if folder does not exists
 COPY --from=production-builder /rails/publi[c]/pack[s]/ ./public/packs
+# 2bis) Build output listed in EXTRA_PUBLIC_PATHS, staged by the builder stage
+COPY --from=production-builder /extra_public/ ./public/
 # 3) We can even copy the Bootsnap cache to speed up our Rails server load!
 COPY --from=production-builder /rails/tm[p]/cach[e]/bootsnap* ./tmp/cache/bootsnap
 

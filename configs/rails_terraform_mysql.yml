@@ -58,6 +58,10 @@ parameters:
     description: "space separated list of pip packages to install (usefull for apps using pycall - ifu_generator)"
     type: string
     default: ""
+  extra-public-paths:
+    description: "space separated paths relative to public/, written by the assets build, to copy into the docker image on top of public/assets and public/packs (e.g. pdfjs). The build fails if one is missing."
+    type: string
+    default: ""
   tests-parallelism:
     type: integer
     default: 1
@@ -438,6 +442,7 @@ jobs:
               --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
               --build-arg PACKAGES_TO_INSTALL="<< pipeline.parameters.packages-to-install >>" \
               --build-arg PIP_PACKAGES="<< pipeline.parameters.pip-packages >>" \
+              --build-arg EXTRA_PUBLIC_PATHS="<< pipeline.parameters.extra-public-paths >>" \
               --file .dockerdev/Dockerfile \
               .
       - run:
