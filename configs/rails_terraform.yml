@@ -15,6 +15,10 @@ parameters:
   ruby-version:
     type: string
     default: "3.2.2"
+  security-check-image:
+    description: "image repository for the security_check job, tagged with ruby-version"
+    type: string
+    default: "cimg/ruby"
   rails-env:
     type: string
     default: "staging"
@@ -358,7 +362,7 @@ jobs:
     working_directory: ~/<< pipeline.parameters.project-name >>
     resource_class: small
     docker:
-      - image: cimg/ruby:<< pipeline.parameters.ruby-version >>
+      - image: << pipeline.parameters.security-check-image >>:<< pipeline.parameters.ruby-version >>
         environment:
           RAILS_ENV: test
     steps:
